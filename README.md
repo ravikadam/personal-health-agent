@@ -37,6 +37,23 @@ as the default ontology.
 
 ---
 
+## The ontology at a glance
+
+A faithful subset of the Personal Health Management ontology
+([`ontology/personal_health_management.owl`](ontology/personal_health_management.owl))
+— the class hierarchy grouped by branch, plus the key object properties that
+tie observations, conditions, interventions and memory together. Every subclass
+edge and property shown is verified against the OWL file at generation time.
+
+<p align="center">
+  <img src="docs/ontology.svg" alt="Personal Health Management ontology — class hierarchy and key object properties" width="100%">
+</p>
+
+<sub>Regenerate after editing the ontology:
+`python docs/generate_ontology_diagram.py`</sub>
+
+---
+
 ## Quick start
 
 ```bash
@@ -210,3 +227,15 @@ Local-first and simple · ontology as the semantic authority (not just
 structure) · SQLite for fast vitals storage, ontology for meaning ·
 provider-agnostic LLM for extraction/summary, not storage · optimized for
 recall speed and explainability.
+
+---
+
+## Disclaimer
+
+This project is for personal tracking and educational purposes only. It is
+**not a medical device** and does not provide medical advice, diagnosis, or
+treatment. Always consult a qualified healthcare professional about your health.
+
+## License
+
+Released under the [MIT License](LICENSE).

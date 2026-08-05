@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1268 800" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif">
+<defs><marker id="arw" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L9,3 L0,6 Z" fill="#64748b"/></marker></defs>
+<rect x="0" y="0" width="1268" height="800" rx="16" fill="#f8fafc" stroke="#e2e8f0"/>
+<text x="28" y="34" font-size="17" font-weight="800" fill="#334155">Personal Health Management ontology <tspan font-weight="500" fill="#64748b">— faithful subset (phm: prefix)</tspan></text>
+<text x="28" y="56" font-size="12" fill="#64748b">All classes are subclasses of phm:Entity. Boxes are owl:Class; labelled arrows are owl:ObjectProperty (domain → range).</text>
+<rect x="16" y="70" width="196" height="26" rx="7" fill="#2563eb" opacity="0.16"/>
+<text x="114" y="87" text-anchor="middle" font-size="12.5" font-weight="800" fill="#2563eb">Agents</text>
+<line x1="24" y1="149.0" x2="24" y2="359.0" stroke="#2563eb" stroke-width="1.4" opacity="0.5"/>
+<rect x="26" y="103" width="176" height="46" rx="9" fill="#2563eb" stroke="#ffffff" stroke-width="2.2"/><text x="114" y="130" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">Agent</text>
+<line x1="24" y1="190" x2="26" y2="190" stroke="#2563eb" stroke-width="1.4" opacity="0.5"/>
+<rect x="26" y="167" width="176" height="46" rx="9" fill="#2563eb" stroke="rgba(255,255,255,0.35)" stroke-width="1"/><text x="114" y="194" text-anchor="middle" font-size="12.5" font-weight="600" fill="#fff">Person</text>
+<line x1="24" y1="254" x2="26" y2="254" stroke="#2563eb" stroke-width="1.4" opacity="0.5"/>
+<rect x="26" y="231" width="176" height="46" rx="9" fill="#2563eb" stroke="rgba(255,255,255,0.35)" stroke-width="1"/><text x="114" y="258" text-anchor="middle" font-size="12.5" font-weight="600" fill="#fff">Clinician</text>
+<line x1="24" y1="318" x2="26" y2="318" stroke="#2563eb" stroke-width="1.4" opacity="0.5"/>
+<rect x="26" y="295" width="176" height="46" rx="9" fill="#2563eb" stroke="rgba(255,255,255,0.35)" stroke-width="1"/><text x="114" y="315" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">Caregiver</text><text x="114" y="331" text-anchor="middle" font-size="9.5" fill="rgba(255,255,255,0.85)">⊂ Person</text>
+<line x1="24" y1="382" x2="26" y2="382" stroke="#2563eb" stroke-width="1.4" opacity="0.5"/>
+<rect x="26" y="359" width="176" height="46" rx="9" fill="#2563eb" stroke="rgba(255,255,255,0.35)" stroke-width="1"/><text x="114" y="379" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">Software agent</text><text x="114" y="395" text-anchor="middle" font-size="9.5" fill="rgba(255,255,255,0.85)">⊂ Agent</text>
+<rect x="224" y="70" width="196" height="26" rx="7" fill="#dc2626" opacity="0.16"/>
+<text x="322" y="87" text-anchor="middle" font-size="12.5" font-weight="800" fill="#dc2626">Health state</text>
+<line x1="232" y1="149.0" x2="232" y2="359.0" stroke="#dc2626" stroke-width="1.4" opacity="0.5"/>
+<rect x="234" y="103" width="176" height="46" rx="9" fill="#dc2626" stroke="#ffffff" stroke-width="2.2"/><text x="322" y="130" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">Health concept</text>
+<line x1="232" y1="190" x2="234" y2="190" stroke="#dc2626" stroke-width="1.4" opacity="0.5"/>
+<rect x="234" y="167" width="176" height="46" rx="9" fill="#dc2626" stroke="rgba(255,255,255,0.35)" stroke-width="1"/><text x="322" y="194" text-anchor="middle" font-size="12.5" font-weight="600" fill="#fff">Health condition</text>
+<line x1="232" y1="254" x2="234" y2="254" stroke="#dc2626" stroke-width="1.4" opacity="0.5"/>
+<rect x="234" y="231" width="176" height="46" rx="9" fill="#dc2626" stroke="rgba(255,255,255,0.35)" stroke-width="1"/><text x="322" y="258" text-anchor="middle" font-size="12.5" font-weight="600" fill="#fff">Chronic condition</text>
+<line x1="232" y1="318" x2="234" y2="318" stroke="#dc2626" stroke-width="1.4" opacity="0.5"/>
+<rect x="234" y="295" width="176" height="46" rx="9" fill="#dc2626" stroke="rgba(255,255,255,0.35)" stroke-width="1"/><text x="322" y="315" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">Symptom</text><text x="322" y="331" text-anchor="middle" font-size="9.5" fill="rgba(255,255,255,0.85)">⊂ HealthConcept</text>
+<line x1="232" y1="382" x2="234" y2="382" stroke="#dc2626" stroke-width="1.4" opacity="0.5"/>
+<rect x="234" y="359" width="176" height="46" rx="9" fill="#dc2626" stroke="rgba(255,255,255,0.35)" stroke-width="1"/><text x="322" y="379" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">Risk factor</text><text x="322" y="395" text-anchor="middle" font-size="9.5" fill="rgba(255,255,255,0.85)">⊂ HealthConcept</text>
+<rect x="432" y="70" width="196" height="26" rx="7" fill="#059669" opacity="0.16"/>
+<text x="530" y="87" text-anchor="middle" font-size="12.5" font-weight="800" fill="#059669">Observations</text>
+<line x1="440" y1="149.0" x2="440" y2="359.0" stroke="#059669" stroke-width="1.4" opacity="0.5"/>
+<rect x="442" y="103" width="176" height="46" rx="9" fill="#059669" stroke="#ffffff" stroke-width="2.2"/><text x="530" y="130" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">Observation</text>
+<line x1="440" y1="190" x2="442" y2="190" stroke="#059669" stroke-width="1.4" opacity="0.5"/>
+<rect x="442" y="167" width="176" height="46" rx="9" fill="#059669" stroke="rgba(255,255,255,0.35)" stroke-width="1"/><text x="530" y="194" text-anchor="middle" font-size="12.5" font-weight="600" fill="#fff">Quantitative observation</text>
+<line x1="440" y1="254" x2="442" y2="254" stroke="#059669" stroke-width="1.4" opacity="0.5"/>
+<rect x="442" y="231" width="176" height="46" rx="9" fill="#059669" stroke="rgba(255,255,255,0.35)" stroke-width="1"/><text x="530" y="258" text-anchor="middle" font-size="12.5" font-weight="600" fill="#fff">Glucose observation</text>
+<line x1="440" y1="318" x2="442" y2="318" stroke="#059669" stroke-width="1.4" opacity="0.5"/>
+<rect x="442" y="295" width="176" height="46" rx="9" fill="#059669" stroke="rgba(255,255,255,0.35)" stroke-width="1"/><text x="530" y="315" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">Vital-sign observation</text><text x="530" y="331" text-anchor="middle" font-size="9.5" fill="rgba(255,255,255,0.85)">⊂ QuantitativeObservation</text>
+<line x1="440" y1="382" x2="442" y2="382" stroke="#059669" stroke-width="1.4" opacity="0.5"/>
+<rect x="442" y="359" width="176" height="46" rx="9" fill="#059669" stroke="rgba(255,255,255,0.35)" stroke-width="1"/><text x="530" y="386" text-anchor="middle" font-size="12.5" font-weight="600" fill="#fff">Blood-pressure observation</text>
+<rect x="640" y="70" width="196" height="26" rx="7" fill="#7c3aed" opacity="0.16"/>
+<text x="738" y="87" text-anchor="middle" font-size="12.5" font-weight="800" fill="#7c3aed">Interventions</text>
+<line x1="648" y1="149.0" x2="648" y2="359.0" stroke="#7c3aed" stroke-width="1.4" opacity="0.5"/>
+<rect x="650" y="103" width="176" height="46" rx="9" fill="#7c3aed" stroke="#ffffff" stroke-width="2.2"/><text x="738" y="130" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">Intervention</text>
+<line x1="648" y1="190" x2="650" y2="190" stroke="#7c3aed" stroke-width="1.4" opacity="0.5"/>
+<rect x="650" y="167" width="176" height="46" rx="9" fill="#7c3aed" stroke="rgba(255,255,255,0.35)" stroke-width="1"/><text x="738" y="187" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">Medication intervention</text><text x="738" y="203" text-anchor="middle" font-size="9.5" fill="rgba(255,255,255,0.85)">⊂ ClinicalIntervention</text>
+<line x1="648" y1="254" x2="650" y2="254" stroke="#7c3aed" stroke-width="1.4" opacity="0.5"/>
+<rect x="650" y="231" width="176" height="46" rx="9" fill="#7c3aed" stroke="rgba(255,255,255,0.35)" stroke-width="1"/><text x="738" y="251" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">Intervention execution</text><text x="738" y="267" text-anchor="middle" font-size="9.5" fill="rgba(255,255,255,0.85)">⊂ TemporalEntity</text>
+<line x1="648" y1="318" x2="650" y2="318" stroke="#7c3aed" stroke-width="1.4" opacity="0.5"/>
+<rect x="650" y="295" width="176" height="46" rx="9" fill="#7c3aed" stroke="rgba(255,255,255,0.35)" stroke-width="1"/><text x="738" y="322" text-anchor="middle" font-size="12.5" font-weight="600" fill="#fff">Medication administration</text>
+<line x1="648" y1="382" x2="650" y2="382" stroke="#7c3aed" stroke-width="1.4" opacity="0.5"/>
+<rect x="650" y="359" width="176" height="46" rx="9" fill="#7c3aed" stroke="rgba(255,255,255,0.35)" stroke-width="1"/><text x="738" y="379" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">Exercise session</text><text x="738" y="395" text-anchor="middle" font-size="9.5" fill="rgba(255,255,255,0.85)">⊂ InterventionExecution</text>
+<rect x="848" y="70" width="196" height="26" rx="7" fill="#0891b2" opacity="0.16"/>
+<text x="946" y="87" text-anchor="middle" font-size="12.5" font-weight="800" fill="#0891b2">Plans &amp; Goals</text>
+<line x1="856" y1="149.0" x2="856" y2="359.0" stroke="#0891b2" stroke-width="1.4" opacity="0.5"/>
+<rect x="858" y="103" width="176" height="46" rx="9" fill="#0891b2" stroke="#ffffff" stroke-width="2.2"/><text x="946" y="130" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">Goal</text>
+<line x1="856" y1="190" x2="858" y2="190" stroke="#0891b2" stroke-width="1.4" opacity="0.5"/>
+<rect x="858" y="167" width="176" height="46" rx="9" fill="#0891b2" stroke="rgba(255,255,255,0.35)" stroke-width="1"/><text x="946" y="194" text-anchor="middle" font-size="12.5" font-weight="600" fill="#fff">Health goal</text>
+<line x1="856" y1="254" x2="858" y2="254" stroke="#0891b2" stroke-width="1.4" opacity="0.5"/>
+<rect x="858" y="231" width="176" height="46" rx="9" fill="#0891b2" stroke="rgba(255,255,255,0.35)" stroke-width="1"/><text x="946" y="251" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">Plan</text><text x="946" y="267" text-anchor="middle" font-size="9.5" fill="rgba(255,255,255,0.85)">⊂ InformationArtifact</text>
+<line x1="856" y1="318" x2="858" y2="318" stroke="#0891b2" stroke-width="1.4" opacity="0.5"/>
+<rect x="858" y="295" width="176" height="46" rx="9" fill="#0891b2" stroke="rgba(255,255,255,0.35)" stroke-width="1"/><text x="946" y="322" text-anchor="middle" font-size="12.5" font-weight="600" fill="#fff">Personal health plan</text>
+<line x1="856" y1="382" x2="858" y2="382" stroke="#0891b2" stroke-width="1.4" opacity="0.5"/>
+<rect x="858" y="359" width="176" height="46" rx="9" fill="#0891b2" stroke="rgba(255,255,255,0.35)" stroke-width="1"/><text x="946" y="379" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">Recommendation</text><text x="946" y="395" text-anchor="middle" font-size="9.5" fill="rgba(255,255,255,0.85)">⊂ InformationArtifact</text>
+<rect x="1056" y="70" width="196" height="26" rx="7" fill="#d97706" opacity="0.16"/>
+<text x="1154" y="87" text-anchor="middle" font-size="12.5" font-weight="800" fill="#d97706">Memory &amp; Evidence</text>
+<line x1="1064" y1="149.0" x2="1064" y2="359.0" stroke="#d97706" stroke-width="1.4" opacity="0.5"/>
+<rect x="1066" y="103" width="176" height="46" rx="9" fill="#d97706" stroke="#ffffff" stroke-width="2.2"/><text x="1154" y="130" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">Interpretation</text>
+<line x1="1064" y1="190" x2="1066" y2="190" stroke="#d97706" stroke-width="1.4" opacity="0.5"/>
+<rect x="1066" y="167" width="176" height="46" rx="9" fill="#d97706" stroke="rgba(255,255,255,0.35)" stroke-width="1"/><text x="1154" y="187" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">Memory assertion</text><text x="1154" y="203" text-anchor="middle" font-size="9.5" fill="rgba(255,255,255,0.85)">⊂ InformationArtifact</text>
+<line x1="1064" y1="254" x2="1066" y2="254" stroke="#d97706" stroke-width="1.4" opacity="0.5"/>
+<rect x="1066" y="231" width="176" height="46" rx="9" fill="#d97706" stroke="rgba(255,255,255,0.35)" stroke-width="1"/><text x="1154" y="251" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">Evidence item</text><text x="1154" y="267" text-anchor="middle" font-size="9.5" fill="rgba(255,255,255,0.85)">⊂ InformationArtifact</text>
+<line x1="1064" y1="318" x2="1066" y2="318" stroke="#d97706" stroke-width="1.4" opacity="0.5"/>
+<rect x="1066" y="295" width="176" height="46" rx="9" fill="#d97706" stroke="rgba(255,255,255,0.35)" stroke-width="1"/><text x="1154" y="315" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">Provenance record</text><text x="1154" y="331" text-anchor="middle" font-size="9.5" fill="rgba(255,255,255,0.85)">⊂ InformationArtifact</text>
+<line x1="1064" y1="382" x2="1066" y2="382" stroke="#d97706" stroke-width="1.4" opacity="0.5"/>
+<rect x="1066" y="359" width="176" height="46" rx="9" fill="#d97706" stroke="rgba(255,255,255,0.35)" stroke-width="1"/><text x="1154" y="379" text-anchor="middle" font-size="12.5" font-weight="700" fill="#fff">Association assessment</text><text x="1154" y="395" text-anchor="middle" font-size="9.5" fill="rgba(255,255,255,0.85)">⊂ Interpretation</text>
+<text x="28" y="452" font-size="15" font-weight="800" fill="#334155">Key relationships <tspan font-weight="500" fill="#64748b">(object properties)</tspan></text>
+<line x1="268.0" y1="520.0" x2="402.0" y2="520.0" stroke="#64748b" stroke-width="1.6" marker-end="url(#arw)"/><rect x="286.0" y="509.0" width="98" height="18" rx="9" fill="#475569"/><text x="335.0" y="522.0" text-anchor="middle" font-size="10.5" fill="#fff" font-family="monospace">hasCondition</text>
+<line x1="578.0" y1="520.0" x2="712.0" y2="520.0" stroke="#64748b" stroke-width="1.6" marker-end="url(#arw)"/><rect x="599.5" y="509.0" width="91" height="18" rx="9" fill="#475569"/><text x="645.0" y="522.0" text-anchor="middle" font-size="10.5" fill="#fff" font-family="monospace">manifestsAs</text>
+<line x1="180.0" y1="667.0" x2="180.0" y2="543.0" stroke="#64748b" stroke-width="1.6" marker-end="url(#arw)"/><rect x="134.5" y="594.0" width="91" height="18" rx="9" fill="#475569"/><text x="180.0" y="607.0" text-anchor="middle" font-size="10.5" fill="#fff" font-family="monospace">observedFor</text>
+<line x1="490.0" y1="667.0" x2="490.0" y2="543.0" stroke="#64748b" stroke-width="1.6" marker-end="url(#arw)"/><rect x="420.0" y="594.0" width="140" height="18" rx="9" fill="#475569"/><text x="490.0" y="607.0" text-anchor="middle" font-size="10.5" fill="#fff" font-family="monospace">addressesCondition</text>
+<line x1="712.0" y1="690.0" x2="578.0" y2="690.0" stroke="#64748b" stroke-width="1.6" marker-end="url(#arw)"/><rect x="568.0" y="679.0" width="154" height="18" rx="9" fill="#475569"/><text x="645.0" y="692.0" text-anchor="middle" font-size="10.5" fill="#fff" font-family="monospace">executesIntervention</text>
+<line x1="1090.0" y1="543.0" x2="1090.0" y2="667.0" stroke="#64748b" stroke-width="1.6" marker-end="url(#arw)"/><rect x="1044.5" y="594.0" width="91" height="18" rx="9" fill="#475569"/><text x="1090.0" y="607.0" text-anchor="middle" font-size="10.5" fill="#fff" font-family="monospace">hasEvidence</text>
+<path d="M800,713.0 L800,745 L44,745 L44,520 L92.0,520" fill="none" stroke="#64748b" stroke-width="1.6" marker-end="url(#arw)"/><rect x="360" y="736" width="104" height="18" rx="9" fill="#475569"/><text x="412" y="749" text-anchor="middle" font-size="10.5" fill="#fff" font-family="monospace">performedBy</text>
+<rect x="92" y="497" width="176" height="46" rx="9" fill="#2563eb" stroke="#ffffff" stroke-width="2.2"/><text x="180" y="524" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">Person</text>
+<rect x="402" y="497" width="176" height="46" rx="9" fill="#dc2626" stroke="#ffffff" stroke-width="2.2"/><text x="490" y="524" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">Health condition</text>
+<rect x="712" y="497" width="176" height="46" rx="9" fill="#ef4444" stroke="#ffffff" stroke-width="2.2"/><text x="800" y="524" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">Symptom</text>
+<rect x="1002" y="497" width="176" height="46" rx="9" fill="#d97706" stroke="#ffffff" stroke-width="2.2"/><text x="1090" y="524" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">Memory assertion</text>
+<rect x="92" y="667" width="176" height="46" rx="9" fill="#059669" stroke="#ffffff" stroke-width="2.2"/><text x="180" y="694" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">Observation</text>
+<rect x="402" y="667" width="176" height="46" rx="9" fill="#7c3aed" stroke="#ffffff" stroke-width="2.2"/><text x="490" y="694" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">Intervention</text>
+<rect x="712" y="667" width="176" height="46" rx="9" fill="#7c3aed" stroke="#ffffff" stroke-width="2.2"/><text x="800" y="694" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">Intervention execution</text>
+<rect x="1002" y="667" width="176" height="46" rx="9" fill="#d97706" stroke="#ffffff" stroke-width="2.2"/><text x="1090" y="694" text-anchor="middle" font-size="13" font-weight="800" fill="#fff">Evidence item</text>
+<text x="28" y="782" font-size="11" fill="#64748b">Generated from ontology/personal_health_management.owl · 123 classes, 54 object properties total. Diagram shows a curated subset.</text>
+</svg>
