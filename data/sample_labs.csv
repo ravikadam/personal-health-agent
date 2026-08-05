@@ -1,0 +1,9 @@
+metric,value,unit,timestamp
+glucose,142,mg/dL,2026-07-28T08:00:00
+glucose,158,mg/dL,2026-07-30T08:00:00
+glucose,171,mg/dL,2026-08-01T08:00:00
+systolic,126,mmHg,2026-07-28T08:00:00
+diastolic,82,mmHg,2026-07-28T08:00:00
+heart_rate,72,bpm,2026-07-28T08:00:00
+weight,81.5,kg,2026-07-28T08:00:00
+sleep,6.5,hours,2026-07-28T23:00:00

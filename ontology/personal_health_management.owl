@@ -1,0 +1,311 @@
+@prefix phm: <https://w3id.org/phm/ontology#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+<https://w3id.org/phm/ontology> a owl:Ontology ;
+  dcterms:title "Personal Health Management Ontology"@en ;
+  dcterms:description "An OWL ontology for longitudinal, whole-person management of chronic conditions through clinical care, medication, nutrition, physical activity, sleep, recovery and contemplative practice. It separates plans from executions, observations from interpretations, and associations from causal claims."@en ;
+  dcterms:creator "OpenAI Codex, prepared for Ravi"@en ;
+  dcterms:created "2026-08-05"^^xsd:date ;
+  owl:versionInfo "0.1.0" ;
+  rdfs:comment "Designed as a domain ontology for personal-health agent memory. Clinical codes should be linked through skos:exactMatch, skos:closeMatch, or dcterms:identifier rather than recreated locally."@en .
+
+#################################################################
+# Upper-level concepts
+#################################################################
+
+phm:Entity a owl:Class ; rdfs:label "Entity"@en .
+phm:Agent a owl:Class ; rdfs:subClassOf phm:Entity ; rdfs:label "Agent"@en .
+phm:Person a owl:Class ; rdfs:subClassOf phm:Agent ; rdfs:label "Person"@en .
+phm:CareProfessional a owl:Class ; rdfs:subClassOf phm:Person ; rdfs:label "Care professional"@en .
+phm:Clinician a owl:Class ; rdfs:subClassOf phm:CareProfessional ; rdfs:label "Clinician"@en .
+phm:Coach a owl:Class ; rdfs:subClassOf phm:CareProfessional ; rdfs:label "Coach"@en .
+phm:Caregiver a owl:Class ; rdfs:subClassOf phm:Person ; rdfs:label "Caregiver"@en .
+phm:SoftwareAgent a owl:Class ; rdfs:subClassOf phm:Agent ; rdfs:label "Software agent"@en .
+phm:Organization a owl:Class ; rdfs:subClassOf phm:Agent ; rdfs:label "Organization"@en .
+phm:TemporalEntity a owl:Class ; rdfs:subClassOf phm:Entity ; rdfs:label "Temporal entity"@en .
+phm:InformationArtifact a owl:Class ; rdfs:subClassOf phm:Entity ; rdfs:label "Information artifact"@en .
+phm:SourceArtifact a owl:Class ; rdfs:subClassOf phm:InformationArtifact ; rdfs:label "Source artifact"@en .
+phm:Device a owl:Class ; rdfs:subClassOf phm:Entity ; rdfs:label "Device"@en .
+phm:Place a owl:Class ; rdfs:subClassOf phm:Entity ; rdfs:label "Place"@en .
+
+#################################################################
+# Health state and longitudinal context
+#################################################################
+
+phm:HealthConcept a owl:Class ; rdfs:subClassOf phm:Entity ; rdfs:label "Health concept"@en .
+phm:HealthCondition a owl:Class ; rdfs:subClassOf phm:HealthConcept ; rdfs:label "Health condition"@en .
+phm:ChronicCondition a owl:Class ;
+  rdfs:subClassOf phm:HealthCondition,
+    [ a owl:Restriction ; owl:onProperty phm:affectsPerson ; owl:someValuesFrom phm:Person ] ;
+  rdfs:label "Chronic condition"@en .
+phm:Comorbidity a owl:Class ; rdfs:subClassOf phm:ChronicCondition ; rdfs:label "Comorbidity"@en .
+phm:Complication a owl:Class ; rdfs:subClassOf phm:HealthCondition ; rdfs:label "Complication"@en .
+phm:RiskFactor a owl:Class ; rdfs:subClassOf phm:HealthConcept ; rdfs:label "Risk factor"@en .
+phm:Symptom a owl:Class ; rdfs:subClassOf phm:HealthConcept ; rdfs:label "Symptom"@en .
+phm:Sign a owl:Class ; rdfs:subClassOf phm:HealthConcept ; rdfs:label "Clinical sign"@en .
+phm:FunctionalLimitation a owl:Class ; rdfs:subClassOf phm:HealthConcept ; rdfs:label "Functional limitation"@en .
+phm:Contraindication a owl:Class ; rdfs:subClassOf phm:HealthConcept ; rdfs:label "Contraindication"@en .
+phm:Precaution a owl:Class ; rdfs:subClassOf phm:HealthConcept ; rdfs:label "Precaution"@en .
+phm:AdverseEvent a owl:Class ; rdfs:subClassOf phm:HealthConcept ; rdfs:label "Adverse event"@en .
+phm:HealthEpisode a owl:Class ; rdfs:subClassOf phm:TemporalEntity ; rdfs:label "Health episode"@en .
+phm:ConditionCourse a owl:Class ; rdfs:subClassOf phm:TemporalEntity ; rdfs:label "Condition course"@en .
+
+#################################################################
+# Goals, plans and recommendations
+#################################################################
+
+phm:Goal a owl:Class ; rdfs:subClassOf phm:InformationArtifact ; rdfs:label "Goal"@en .
+phm:HealthGoal a owl:Class ;
+  rdfs:subClassOf phm:Goal,
+    [ a owl:Restriction ; owl:onProperty phm:goalForPerson ; owl:someValuesFrom phm:Person ] ;
+  rdfs:label "Health goal"@en .
+phm:ClinicalGoal a owl:Class ; rdfs:subClassOf phm:HealthGoal ; rdfs:label "Clinical goal"@en .
+phm:FitnessGoal a owl:Class ; rdfs:subClassOf phm:HealthGoal ; rdfs:label "Fitness goal"@en .
+phm:NutritionGoal a owl:Class ; rdfs:subClassOf phm:HealthGoal ; rdfs:label "Nutrition goal"@en .
+phm:WellbeingGoal a owl:Class ; rdfs:subClassOf phm:HealthGoal ; rdfs:label "Wellbeing goal"@en .
+phm:Plan a owl:Class ; rdfs:subClassOf phm:InformationArtifact ; rdfs:label "Plan"@en .
+phm:PersonalHealthPlan a owl:Class ;
+  rdfs:subClassOf phm:Plan,
+    [ a owl:Restriction ; owl:onProperty phm:planForPerson ; owl:qualifiedCardinality "1"^^xsd:nonNegativeInteger ; owl:onClass phm:Person ] ;
+  rdfs:label "Personal health plan"@en .
+phm:PlanComponent a owl:Class ; rdfs:subClassOf phm:InformationArtifact ; rdfs:label "Plan component"@en .
+phm:Recommendation a owl:Class ; rdfs:subClassOf phm:InformationArtifact ; rdfs:label "Recommendation"@en .
+phm:ClinicalRecommendation a owl:Class ; rdfs:subClassOf phm:Recommendation ; rdfs:label "Clinical recommendation"@en .
+phm:SelfManagementDecision a owl:Class ; rdfs:subClassOf phm:InformationArtifact ; rdfs:label "Self-management decision"@en .
+phm:Routine a owl:Class ; rdfs:subClassOf phm:PlanComponent ; rdfs:label "Routine"@en .
+phm:Schedule a owl:Class ; rdfs:subClassOf phm:PlanComponent ; rdfs:label "Schedule"@en .
+phm:Target a owl:Class ; rdfs:subClassOf phm:PlanComponent ; rdfs:label "Target"@en .
+phm:Threshold a owl:Class ; rdfs:subClassOf phm:PlanComponent ; rdfs:label "Threshold"@en .
+phm:EscalationRule a owl:Class ; rdfs:subClassOf phm:PlanComponent ; rdfs:label "Escalation rule"@en .
+
+#################################################################
+# Interventions and their actual execution
+#################################################################
+
+phm:Intervention a owl:Class ; rdfs:subClassOf phm:HealthConcept ; rdfs:label "Intervention"@en .
+phm:ClinicalIntervention a owl:Class ; rdfs:subClassOf phm:Intervention ; rdfs:label "Clinical intervention"@en .
+phm:MedicationIntervention a owl:Class ; rdfs:subClassOf phm:ClinicalIntervention ; rdfs:label "Medication intervention"@en .
+phm:NutritionIntervention a owl:Class ; rdfs:subClassOf phm:Intervention ; rdfs:label "Nutrition intervention"@en .
+phm:PhysicalActivityIntervention a owl:Class ; rdfs:subClassOf phm:Intervention ; rdfs:label "Physical activity intervention"@en .
+phm:MeditationIntervention a owl:Class ; rdfs:subClassOf phm:Intervention ; rdfs:label "Meditation intervention"@en .
+phm:BreathingPracticeIntervention a owl:Class ; rdfs:subClassOf phm:MeditationIntervention ; rdfs:label "Breathing-practice intervention"@en .
+phm:SleepIntervention a owl:Class ; rdfs:subClassOf phm:Intervention ; rdfs:label "Sleep intervention"@en .
+phm:RecoveryIntervention a owl:Class ; rdfs:subClassOf phm:Intervention ; rdfs:label "Recovery intervention"@en .
+phm:BehaviorChangeIntervention a owl:Class ; rdfs:subClassOf phm:Intervention ; rdfs:label "Behavior-change intervention"@en .
+phm:MonitoringIntervention a owl:Class ; rdfs:subClassOf phm:Intervention ; rdfs:label "Monitoring intervention"@en .
+phm:InterventionExecution a owl:Class ;
+  rdfs:subClassOf phm:TemporalEntity,
+    [ a owl:Restriction ; owl:onProperty phm:executesIntervention ; owl:qualifiedCardinality "1"^^xsd:nonNegativeInteger ; owl:onClass phm:Intervention ],
+    [ a owl:Restriction ; owl:onProperty phm:performedBy ; owl:someValuesFrom phm:Person ] ;
+  rdfs:label "Intervention execution"@en ;
+  rdfs:comment "An intervention actually performed, distinct from a planned or recommended intervention."@en .
+phm:MedicationAdministration a owl:Class ; rdfs:subClassOf phm:InterventionExecution ; rdfs:label "Medication administration"@en .
+phm:MealConsumption a owl:Class ; rdfs:subClassOf phm:InterventionExecution ; rdfs:label "Meal consumption"@en .
+phm:ExerciseSession a owl:Class ; rdfs:subClassOf phm:InterventionExecution ; rdfs:label "Exercise session"@en .
+phm:MeditationSession a owl:Class ; rdfs:subClassOf phm:InterventionExecution ; rdfs:label "Meditation session"@en .
+phm:SleepSession a owl:Class ; rdfs:subClassOf phm:InterventionExecution ; rdfs:label "Sleep session"@en .
+phm:RecoverySession a owl:Class ; rdfs:subClassOf phm:InterventionExecution ; rdfs:label "Recovery session"@en .
+
+#################################################################
+# Medication and nutrition
+#################################################################
+
+phm:Medication a owl:Class ; rdfs:subClassOf phm:Entity ; rdfs:label "Medication"@en .
+phm:ActiveIngredient a owl:Class ; rdfs:subClassOf phm:Entity ; rdfs:label "Active ingredient"@en .
+phm:MedicationOrder a owl:Class ; rdfs:subClassOf phm:InformationArtifact ; rdfs:label "Medication order"@en .
+phm:DoseSpecification a owl:Class ; rdfs:subClassOf phm:InformationArtifact ; rdfs:label "Dose specification"@en .
+phm:MedicationChange a owl:Class ; rdfs:subClassOf phm:TemporalEntity ; rdfs:label "Medication change"@en .
+phm:Food a owl:Class ; rdfs:subClassOf phm:Entity ; rdfs:label "Food"@en .
+phm:Meal a owl:Class ; rdfs:subClassOf phm:Entity ; rdfs:label "Meal"@en .
+phm:Nutrient a owl:Class ; rdfs:subClassOf phm:Entity ; rdfs:label "Nutrient"@en .
+phm:DietaryPattern a owl:Class ; rdfs:subClassOf phm:HealthConcept ; rdfs:label "Dietary pattern"@en .
+phm:MealComposition a owl:Class ; rdfs:subClassOf phm:InformationArtifact ; rdfs:label "Meal composition"@en .
+phm:HydrationIntake a owl:Class ; rdfs:subClassOf phm:InterventionExecution ; rdfs:label "Hydration intake"@en .
+
+#################################################################
+# Fitness, meditation, sleep and wellbeing
+#################################################################
+
+phm:PhysicalActivityType a owl:Class ; rdfs:subClassOf phm:HealthConcept ; rdfs:label "Physical activity type"@en .
+phm:AerobicActivity a owl:Class ; rdfs:subClassOf phm:PhysicalActivityType ; rdfs:label "Aerobic activity"@en .
+phm:StrengthActivity a owl:Class ; rdfs:subClassOf phm:PhysicalActivityType ; rdfs:label "Strength activity"@en .
+phm:MobilityActivity a owl:Class ; rdfs:subClassOf phm:PhysicalActivityType ; rdfs:label "Mobility activity"@en .
+phm:BalanceActivity a owl:Class ; rdfs:subClassOf phm:PhysicalActivityType ; rdfs:label "Balance activity"@en .
+phm:FitnessCapacity a owl:Class ; rdfs:subClassOf phm:HealthConcept ; rdfs:label "Fitness capacity"@en .
+phm:CardiorespiratoryFitness a owl:Class ; rdfs:subClassOf phm:FitnessCapacity ; rdfs:label "Cardiorespiratory fitness"@en .
+phm:MuscularStrength a owl:Class ; rdfs:subClassOf phm:FitnessCapacity ; rdfs:label "Muscular strength"@en .
+phm:MobilityCapacity a owl:Class ; rdfs:subClassOf phm:FitnessCapacity ; rdfs:label "Mobility capacity"@en .
+phm:MeditationTechnique a owl:Class ; rdfs:subClassOf phm:HealthConcept ; rdfs:label "Meditation technique"@en .
+phm:AttentionPractice a owl:Class ; rdfs:subClassOf phm:MeditationTechnique ; rdfs:label "Attention practice"@en .
+phm:OpenAwarenessPractice a owl:Class ; rdfs:subClassOf phm:MeditationTechnique ; rdfs:label "Open-awareness practice"@en .
+phm:MantraPractice a owl:Class ; rdfs:subClassOf phm:MeditationTechnique ; rdfs:label "Mantra practice"@en .
+phm:BreathAwarenessPractice a owl:Class ; rdfs:subClassOf phm:MeditationTechnique ; rdfs:label "Breath-awareness practice"@en .
+phm:SleepCharacteristic a owl:Class ; rdfs:subClassOf phm:HealthConcept ; rdfs:label "Sleep characteristic"@en .
+phm:WellbeingDimension a owl:Class ; rdfs:subClassOf phm:HealthConcept ; rdfs:label "Wellbeing dimension"@en .
+phm:StressLevel a owl:Class ; rdfs:subClassOf phm:WellbeingDimension ; rdfs:label "Stress level"@en .
+phm:Mood a owl:Class ; rdfs:subClassOf phm:WellbeingDimension ; rdfs:label "Mood"@en .
+phm:PerceivedEnergy a owl:Class ; rdfs:subClassOf phm:WellbeingDimension ; rdfs:label "Perceived energy"@en .
+
+#################################################################
+# Observations, measurements and interpretations
+#################################################################
+
+phm:Observation a owl:Class ;
+  rdfs:subClassOf phm:TemporalEntity,
+    [ a owl:Restriction ; owl:onProperty phm:observedFor ; owl:qualifiedCardinality "1"^^xsd:nonNegativeInteger ; owl:onClass phm:Person ],
+    [ a owl:Restriction ; owl:onProperty phm:observes ; owl:someValuesFrom phm:Entity ] ;
+  rdfs:label "Observation"@en .
+phm:QuantitativeObservation a owl:Class ; rdfs:subClassOf phm:Observation ; rdfs:label "Quantitative observation"@en .
+phm:QualitativeObservation a owl:Class ; rdfs:subClassOf phm:Observation ; rdfs:label "Qualitative observation"@en .
+phm:SelfReportedObservation a owl:Class ; rdfs:subClassOf phm:Observation ; rdfs:label "Self-reported observation"@en .
+phm:DeviceObservation a owl:Class ; rdfs:subClassOf phm:Observation ; rdfs:label "Device observation"@en .
+phm:ClinicalObservation a owl:Class ; rdfs:subClassOf phm:Observation ; rdfs:label "Clinical observation"@en .
+phm:LaboratoryObservation a owl:Class ; rdfs:subClassOf phm:ClinicalObservation ; rdfs:label "Laboratory observation"@en .
+phm:SymptomObservation a owl:Class ; rdfs:subClassOf phm:SelfReportedObservation ; rdfs:label "Symptom observation"@en .
+phm:VitalSignObservation a owl:Class ; rdfs:subClassOf phm:QuantitativeObservation ; rdfs:label "Vital-sign observation"@en .
+phm:GlucoseObservation a owl:Class ; rdfs:subClassOf phm:QuantitativeObservation ; rdfs:label "Glucose observation"@en .
+phm:BloodPressureObservation a owl:Class ; rdfs:subClassOf phm:VitalSignObservation ; rdfs:label "Blood-pressure observation"@en .
+phm:HeartRateObservation a owl:Class ; rdfs:subClassOf phm:VitalSignObservation ; rdfs:label "Heart-rate observation"@en .
+phm:BodyWeightObservation a owl:Class ; rdfs:subClassOf phm:QuantitativeObservation ; rdfs:label "Body-weight observation"@en .
+phm:SleepObservation a owl:Class ; rdfs:subClassOf phm:Observation ; rdfs:label "Sleep observation"@en .
+phm:ActivityObservation a owl:Class ; rdfs:subClassOf phm:Observation ; rdfs:label "Activity observation"@en .
+phm:MeditationObservation a owl:Class ; rdfs:subClassOf phm:Observation ; rdfs:label "Meditation observation"@en .
+phm:Unit a owl:Class ; rdfs:subClassOf phm:Entity ; rdfs:label "Unit"@en .
+phm:ReferenceRange a owl:Class ; rdfs:subClassOf phm:InformationArtifact ; rdfs:label "Reference range"@en .
+phm:Interpretation a owl:Class ; rdfs:subClassOf phm:InformationArtifact ; rdfs:label "Interpretation"@en .
+phm:TrendInterpretation a owl:Class ; rdfs:subClassOf phm:Interpretation ; rdfs:label "Trend interpretation"@en .
+phm:ClinicalAssessment a owl:Class ; rdfs:subClassOf phm:Interpretation ; rdfs:label "Clinical assessment"@en .
+
+#################################################################
+# Adherence, outcomes, evidence and memory
+#################################################################
+
+phm:AdherenceAssessment a owl:Class ; rdfs:subClassOf phm:Interpretation ; rdfs:label "Adherence assessment"@en .
+phm:Barrier a owl:Class ; rdfs:subClassOf phm:HealthConcept ; rdfs:label "Barrier"@en .
+phm:Facilitator a owl:Class ; rdfs:subClassOf phm:HealthConcept ; rdfs:label "Facilitator"@en .
+phm:OutcomeAssessment a owl:Class ; rdfs:subClassOf phm:Interpretation ; rdfs:label "Outcome assessment"@en .
+phm:AssociationAssessment a owl:Class ;
+  rdfs:subClassOf phm:Interpretation ;
+  rdfs:label "Association assessment"@en ;
+  rdfs:comment "Records an observed association without asserting causality."@en .
+phm:CausalHypothesis a owl:Class ;
+  rdfs:subClassOf phm:Interpretation ;
+  rdfs:label "Causal hypothesis"@en ;
+  rdfs:comment "A revisable hypothesis, not an established causal fact."@en .
+phm:EvidenceItem a owl:Class ; rdfs:subClassOf phm:InformationArtifact ; rdfs:label "Evidence item"@en .
+phm:ProvenanceRecord a owl:Class ; rdfs:subClassOf phm:InformationArtifact ; rdfs:label "Provenance record"@en .
+phm:MemoryAssertion a owl:Class ;
+  rdfs:subClassOf phm:InformationArtifact,
+    [ a owl:Restriction ; owl:onProperty phm:hasEvidence ; owl:someValuesFrom phm:EvidenceItem ] ;
+  rdfs:label "Memory assertion"@en ;
+  rdfs:comment "A provenance-bearing, time-scoped assertion suitable for agent memory; its status and confidence may change without deleting source evidence."@en .
+
+#################################################################
+# Object properties
+#################################################################
+
+phm:affectsPerson a owl:ObjectProperty ; rdfs:domain phm:HealthCondition ; rdfs:range phm:Person ; rdfs:label "affects person"@en .
+phm:hasCondition a owl:ObjectProperty ; owl:inverseOf phm:affectsPerson ; rdfs:domain phm:Person ; rdfs:range phm:HealthCondition ; rdfs:label "has condition"@en .
+phm:hasComorbidity a owl:ObjectProperty ; rdfs:domain phm:ChronicCondition ; rdfs:range phm:ChronicCondition ; rdfs:label "has comorbidity"@en .
+phm:hasComplication a owl:ObjectProperty ; rdfs:domain phm:HealthCondition ; rdfs:range phm:Complication ; rdfs:label "has complication"@en .
+phm:hasRiskFactor a owl:ObjectProperty ; rdfs:domain phm:Person ; rdfs:range phm:RiskFactor ; rdfs:label "has risk factor"@en .
+phm:manifestsAs a owl:ObjectProperty ; rdfs:domain phm:HealthCondition ; rdfs:range phm:HealthConcept ; rdfs:label "manifests as"@en .
+phm:conditionCourseFor a owl:ObjectProperty ; rdfs:domain phm:ConditionCourse ; rdfs:range phm:HealthCondition ; rdfs:label "condition course for"@en .
+phm:goalForPerson a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:domain phm:HealthGoal ; rdfs:range phm:Person ; rdfs:label "goal for person"@en .
+phm:targetsCondition a owl:ObjectProperty ; rdfs:domain phm:Goal ; rdfs:range phm:HealthCondition ; rdfs:label "targets condition"@en .
+phm:targetsConcept a owl:ObjectProperty ; rdfs:domain phm:Goal ; rdfs:range phm:HealthConcept ; rdfs:label "targets concept"@en .
+phm:planForPerson a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:domain phm:PersonalHealthPlan ; rdfs:range phm:Person ; rdfs:label "plan for person"@en .
+phm:hasPlanComponent a owl:ObjectProperty ; rdfs:domain phm:Plan ; rdfs:range phm:PlanComponent ; rdfs:label "has plan component"@en .
+phm:pursuesGoal a owl:ObjectProperty ; rdfs:domain phm:Plan ; rdfs:range phm:Goal ; rdfs:label "pursues goal"@en .
+phm:plansIntervention a owl:ObjectProperty ; rdfs:domain phm:PlanComponent ; rdfs:range phm:Intervention ; rdfs:label "plans intervention"@en .
+phm:recommendedBy a owl:ObjectProperty ; rdfs:domain phm:Recommendation ; rdfs:range phm:Agent ; rdfs:label "recommended by"@en .
+phm:recommendsIntervention a owl:ObjectProperty ; rdfs:domain phm:Recommendation ; rdfs:range phm:Intervention ; rdfs:label "recommends intervention"@en .
+phm:executesIntervention a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:domain phm:InterventionExecution ; rdfs:range phm:Intervention ; rdfs:label "executes intervention"@en .
+phm:performedBy a owl:ObjectProperty ; rdfs:domain phm:InterventionExecution ; rdfs:range phm:Person ; rdfs:label "performed by"@en .
+phm:performedAt a owl:ObjectProperty ; rdfs:domain phm:InterventionExecution ; rdfs:range phm:Place ; rdfs:label "performed at"@en .
+phm:addressesCondition a owl:ObjectProperty ; rdfs:domain phm:Intervention ; rdfs:range phm:HealthCondition ; rdfs:label "addresses condition"@en .
+phm:hasContraindication a owl:ObjectProperty ; rdfs:domain phm:Intervention ; rdfs:range phm:Contraindication ; rdfs:label "has contraindication"@en .
+phm:hasPrecaution a owl:ObjectProperty ; rdfs:domain phm:Intervention ; rdfs:range phm:Precaution ; rdfs:label "has precaution"@en .
+phm:usesMedication a owl:ObjectProperty ; rdfs:domain phm:MedicationIntervention ; rdfs:range phm:Medication ; rdfs:label "uses medication"@en .
+phm:hasActiveIngredient a owl:ObjectProperty ; rdfs:domain phm:Medication ; rdfs:range phm:ActiveIngredient ; rdfs:label "has active ingredient"@en .
+phm:hasDoseSpecification a owl:ObjectProperty ; rdfs:domain phm:MedicationOrder ; rdfs:range phm:DoseSpecification ; rdfs:label "has dose specification"@en .
+phm:ordersMedication a owl:ObjectProperty ; rdfs:domain phm:MedicationOrder ; rdfs:range phm:Medication ; rdfs:label "orders medication"@en .
+phm:prescribedFor a owl:ObjectProperty ; rdfs:domain phm:MedicationOrder ; rdfs:range phm:Person ; rdfs:label "prescribed for"@en .
+phm:consumesMeal a owl:ObjectProperty ; rdfs:domain phm:MealConsumption ; rdfs:range phm:Meal ; rdfs:label "consumes meal"@en .
+phm:containsFood a owl:ObjectProperty ; rdfs:domain phm:Meal ; rdfs:range phm:Food ; rdfs:label "contains food"@en .
+phm:containsNutrient a owl:ObjectProperty ; rdfs:domain phm:Food ; rdfs:range phm:Nutrient ; rdfs:label "contains nutrient"@en .
+phm:usesActivityType a owl:ObjectProperty ; rdfs:domain phm:ExerciseSession ; rdfs:range phm:PhysicalActivityType ; rdfs:label "uses activity type"@en .
+phm:usesMeditationTechnique a owl:ObjectProperty ; rdfs:domain phm:MeditationSession ; rdfs:range phm:MeditationTechnique ; rdfs:label "uses meditation technique"@en .
+phm:observedFor a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:domain phm:Observation ; rdfs:range phm:Person ; rdfs:label "observed for"@en .
+phm:observes a owl:ObjectProperty ; rdfs:domain phm:Observation ; rdfs:range phm:Entity ; rdfs:label "observes"@en .
+phm:madeBy a owl:ObjectProperty ; rdfs:domain phm:Observation ; rdfs:range phm:Agent ; rdfs:label "made by"@en .
+phm:generatedByDevice a owl:ObjectProperty ; rdfs:domain phm:DeviceObservation ; rdfs:range phm:Device ; rdfs:label "generated by device"@en .
+phm:hasUnit a owl:ObjectProperty ; rdfs:domain phm:QuantitativeObservation ; rdfs:range phm:Unit ; rdfs:label "has unit"@en .
+phm:hasReferenceRange a owl:ObjectProperty ; rdfs:domain phm:Observation ; rdfs:range phm:ReferenceRange ; rdfs:label "has reference range"@en .
+phm:interpretsObservation a owl:ObjectProperty ; rdfs:domain phm:Interpretation ; rdfs:range phm:Observation ; rdfs:label "interprets observation"@en .
+phm:interpretationMadeBy a owl:ObjectProperty ; rdfs:domain phm:Interpretation ; rdfs:range phm:Agent ; rdfs:label "interpretation made by"@en .
+phm:assessesExecution a owl:ObjectProperty ; rdfs:domain phm:AdherenceAssessment ; rdfs:range phm:InterventionExecution ; rdfs:label "assesses execution"@en .
+phm:hasBarrier a owl:ObjectProperty ; rdfs:domain phm:Person ; rdfs:range phm:Barrier ; rdfs:label "has barrier"@en .
+phm:hasFacilitator a owl:ObjectProperty ; rdfs:domain phm:Person ; rdfs:range phm:Facilitator ; rdfs:label "has facilitator"@en .
+phm:assessesOutcomeOf a owl:ObjectProperty ; rdfs:domain phm:OutcomeAssessment ; rdfs:range phm:InterventionExecution ; rdfs:label "assesses outcome of"@en .
+phm:associatedExposure a owl:ObjectProperty ; rdfs:domain phm:AssociationAssessment ; rdfs:range phm:Entity ; rdfs:label "associated exposure"@en .
+phm:associatedOutcome a owl:ObjectProperty ; rdfs:domain phm:AssociationAssessment ; rdfs:range phm:Entity ; rdfs:label "associated outcome"@en .
+phm:hypothesizesCause a owl:ObjectProperty ; rdfs:domain phm:CausalHypothesis ; rdfs:range phm:Entity ; rdfs:label "hypothesizes cause"@en .
+phm:hypothesizesEffect a owl:ObjectProperty ; rdfs:domain phm:CausalHypothesis ; rdfs:range phm:Entity ; rdfs:label "hypothesizes effect"@en .
+phm:derivedFrom a owl:ObjectProperty ; rdfs:domain phm:InformationArtifact ; rdfs:range phm:SourceArtifact ; rdfs:label "derived from"@en .
+phm:hasEvidence a owl:ObjectProperty ; rdfs:domain phm:InformationArtifact ; rdfs:range phm:EvidenceItem ; rdfs:label "has evidence"@en .
+phm:assertionSubject a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:domain phm:MemoryAssertion ; rdfs:range phm:Entity ; rdfs:label "assertion subject"@en .
+phm:assertionObject a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:domain phm:MemoryAssertion ; rdfs:range phm:Entity ; rdfs:label "assertion object"@en .
+phm:supersedes a owl:ObjectProperty ; rdfs:domain phm:MemoryAssertion ; rdfs:range phm:MemoryAssertion ; rdfs:label "supersedes"@en .
+phm:contradicts a owl:ObjectProperty, owl:SymmetricProperty ; rdfs:domain phm:MemoryAssertion ; rdfs:range phm:MemoryAssertion ; rdfs:label "contradicts"@en .
+
+#################################################################
+# Data properties
+#################################################################
+
+phm:startTime a owl:DatatypeProperty ; rdfs:domain phm:TemporalEntity ; rdfs:range xsd:dateTime ; rdfs:label "start time"@en .
+phm:endTime a owl:DatatypeProperty ; rdfs:domain phm:TemporalEntity ; rdfs:range xsd:dateTime ; rdfs:label "end time"@en .
+phm:validFrom a owl:DatatypeProperty ; rdfs:range xsd:dateTime ; rdfs:label "valid from"@en .
+phm:validUntil a owl:DatatypeProperty ; rdfs:range xsd:dateTime ; rdfs:label "valid until"@en .
+phm:recordedAt a owl:DatatypeProperty ; rdfs:range xsd:dateTime ; rdfs:label "recorded at"@en .
+phm:numericValue a owl:DatatypeProperty, owl:FunctionalProperty ; rdfs:domain phm:QuantitativeObservation ; rdfs:range xsd:decimal ; rdfs:label "numeric value"@en .
+phm:textValue a owl:DatatypeProperty ; rdfs:range xsd:string ; rdfs:label "text value"@en .
+phm:durationMinutes a owl:DatatypeProperty ; rdfs:range xsd:decimal ; rdfs:label "duration in minutes"@en .
+phm:frequencyText a owl:DatatypeProperty ; rdfs:range xsd:string ; rdfs:label "frequency text"@en .
+phm:doseValue a owl:DatatypeProperty ; rdfs:domain phm:DoseSpecification ; rdfs:range xsd:decimal ; rdfs:label "dose value"@en .
+phm:doseUnit a owl:DatatypeProperty ; rdfs:domain phm:DoseSpecification ; rdfs:range xsd:string ; rdfs:label "dose unit"@en .
+phm:routeText a owl:DatatypeProperty ; rdfs:domain phm:MedicationOrder ; rdfs:range xsd:string ; rdfs:label "route text"@en .
+phm:intensityText a owl:DatatypeProperty ; rdfs:domain phm:ExerciseSession ; rdfs:range xsd:string ; rdfs:label "intensity text"@en .
+phm:perceivedExertion a owl:DatatypeProperty ; rdfs:domain phm:ExerciseSession ; rdfs:range xsd:decimal ; rdfs:label "perceived exertion"@en .
+phm:servingAmount a owl:DatatypeProperty ; rdfs:domain phm:MealComposition ; rdfs:range xsd:decimal ; rdfs:label "serving amount"@en .
+phm:servingUnit a owl:DatatypeProperty ; rdfs:domain phm:MealComposition ; rdfs:range xsd:string ; rdfs:label "serving unit"@en .
+phm:confidenceScore a owl:DatatypeProperty ; rdfs:range xsd:decimal ; rdfs:label "confidence score"@en ; rdfs:comment "Expected range 0 to 1; enforce operationally with SHACL or application validation."@en .
+phm:assertionPredicate a owl:DatatypeProperty, owl:FunctionalProperty ; rdfs:domain phm:MemoryAssertion ; rdfs:range xsd:anyURI ; rdfs:label "assertion predicate"@en .
+phm:assertionStatus a owl:DatatypeProperty ; rdfs:domain phm:MemoryAssertion ; rdfs:range xsd:string ; rdfs:label "assertion status"@en .
+phm:accessScope a owl:DatatypeProperty ; rdfs:range xsd:string ; rdfs:label "access scope"@en .
+phm:externalCode a owl:DatatypeProperty ; rdfs:range xsd:string ; rdfs:label "external code"@en .
+phm:externalCodeSystem a owl:DatatypeProperty ; rdfs:range xsd:anyURI ; rdfs:label "external code system"@en .
+
+#################################################################
+# Disjointness and reusable individuals
+#################################################################
+
+[] a owl:AllDisjointClasses ; owl:members (
+  phm:MedicationIntervention
+  phm:NutritionIntervention
+  phm:PhysicalActivityIntervention
+  phm:MeditationIntervention
+  phm:SleepIntervention
+) .
+
+phm:StatusCandidate a owl:NamedIndividual ; rdfs:label "Candidate"@en .
+phm:StatusAccepted a owl:NamedIndividual ; rdfs:label "Accepted"@en .
+phm:StatusDisputed a owl:NamedIndividual ; rdfs:label "Disputed"@en .
+phm:StatusSuperseded a owl:NamedIndividual ; rdfs:label "Superseded"@en .
+phm:StatusRetracted a owl:NamedIndividual ; rdfs:label "Retracted"@en .
+

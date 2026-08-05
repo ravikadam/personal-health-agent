@@ -1,0 +1,371 @@
+"""Personal Health Agent — Streamlit UI.
+
+A single-file Streamlit front end over the ingestion / memory / retrieval /
+reasoning / report modules. Local-first: all state lives in ./data as JSON.
+
+Run with:  streamlit run app.py
+"""
+
+from __future__ import annotations
+
+import os
+from datetime import datetime
+
+import pandas as pd
+import streamlit as st
+
+from ingestion.extractor import extract_observations, llm_extract
+from ingestion.file_parser import parse_file
+from ingestion.metrics import REGISTRY
+from llm import (DEFAULT_MODELS, MODEL_CHOICES, LLMConfig, default_config,
+                 env_key_for, get_provider, list_providers, sdk_installed)
+from memory.store import MemoryStore
+from ontology.grounding import ground
+from ontology.ontology_loader import load_ontology
+from reports.generator import (build_report, report_to_markdown,
+                               series_dataframe)
+from retrieval.query import answer_query
+
+st.set_page_config(page_title="Personal Health Agent", page_icon="🩺",
+                   layout="wide")
+
+PERSON = "self"
+
+
+@st.cache_resource
+def get_store() -> MemoryStore:
+    return MemoryStore(data_dir="data")
+
+
+@st.cache_resource
+def get_ontology():
+    return load_ontology()
+
+
+store = get_store()
+ontology = get_ontology()
+
+if "chat" not in st.session_state:
+    st.session_state.chat = []  # list of (role, text)
+if "llm_cfg" not in st.session_state:
+    st.session_state.llm_cfg = default_config()
+
+
+def current_provider():
+    """Build an LLM provider from the sidebar selection each run."""
+    return get_provider(st.session_state.llm_cfg)
+
+
+def render_grounding(grounding, key: str):
+    """Show the ontology grounding trace under a response."""
+    with st.expander("🔗 Ontology grounding for this answer", expanded=False):
+        st.caption("Every answer is anchored to these ontology classes, "
+                   "hierarchy paths and relationships.")
+        st.markdown(grounding.as_markdown() or "_No classes matched._")
+
+
+# --------------------------------------------------------------------------- #
+# Sidebar
+# --------------------------------------------------------------------------- #
+with st.sidebar:
+    st.title("🩺 Health Agent")
+    st.caption("Local-first, ontology-aligned memory")
+
+    stats = store.stats()
+    st.metric("Observations", stats["observations"])
+    c1, c2 = st.columns(2)
+    c1.metric("Entities", stats["entities"])
+    c2.metric("Links", stats["relationships"])
+
+    st.divider()
+    st.subheader("Ontology")
+    st.write(f"**{len(ontology.classes)}** classes loaded")
+    st.caption("Personal Health Management Ontology (phm)")
+    if stats["metrics_tracked"]:
+        st.write("**Tracked metrics:**")
+        st.write(", ".join(stats["metrics_tracked"]))
+
+    st.divider()
+    st.subheader("🤖 LLM provider")
+    st.caption("Bring your own model — nothing is hardcoded.")
+
+    cfg: LLMConfig = st.session_state.llm_cfg
+    providers = list_providers()
+    labels = {"none": "None (rule-based)", "openai": "OpenAI",
+              "anthropic": "Claude (Anthropic)", "gemini": "Gemini (Google)"}
+    provider = st.selectbox(
+        "Provider", providers, index=providers.index(cfg.provider),
+        format_func=lambda p: labels.get(p, p) +
+        ("" if p == "none" or sdk_installed(p) else "  ⚠️ SDK not installed"))
+
+    model, api_key = cfg.model, cfg.api_key
+    if provider != "none":
+        choices = MODEL_CHOICES.get(provider, [""])
+        default_model = cfg.model if cfg.model in choices else \
+            DEFAULT_MODELS.get(provider, choices[0])
+        model = st.selectbox("Model", choices,
+                             index=choices.index(default_model)
+                             if default_model in choices else 0)
+        env_present = bool(env_key_for(provider))
+        api_key = st.text_input(
+            "API key", value="" if env_present else cfg.api_key,
+            type="password",
+            placeholder="Using environment variable" if env_present
+            else "Paste API key",
+            help="Kept in session only; never written to disk.")
+        if env_present and not api_key:
+            api_key = env_key_for(provider)
+
+    # Persist selection
+    st.session_state.llm_cfg = LLMConfig(
+        provider=provider, model=model, api_key=api_key,
+        temperature=cfg.temperature)
+
+    _PKG = {"openai": "openai", "anthropic": "anthropic",
+            "gemini": "google-generativeai"}
+    prov = current_provider()
+    if provider == "none":
+        st.caption("Mode: ⚪ deterministic rule-based (no LLM)")
+    elif not sdk_installed(provider):
+        st.warning(f"Install the SDK: `pip install {_PKG.get(provider, provider)}`")
+    elif prov.available():
+        st.success(f"🟢 {labels.get(provider)} ready ({model})")
+    else:
+        st.info("Add an API key to enable this provider.")
+
+    with st.expander("Supported metrics"):
+        for key, m in REGISTRY.items():
+            st.write(f"- **{m.label}** ({m.canonical_unit}) → `{m.ontology_class}`")
+
+
+# --------------------------------------------------------------------------- #
+# Tabs
+# --------------------------------------------------------------------------- #
+tab_chat, tab_upload, tab_report, tab_memory = st.tabs(
+    ["💬 Chat & Log", "📄 Upload", "📊 Report", "🧠 Memory"])
+
+
+# ---- Chat & Log ----------------------------------------------------------- #
+with tab_chat:
+    st.subheader("Log readings or ask questions")
+    st.caption("Log: “fasting glucose 156 mg/dL, BP 128/85, slept 6.5h”. "
+               "Ask: “what's my glucose trend last 7 days?”")
+
+    for role, text in st.session_state.chat:
+        with st.chat_message(role):
+            st.markdown(text)
+
+    prompt = st.chat_input("Log a reading or ask a question…")
+    if prompt:
+        st.session_state.chat.append(("user", prompt))
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        provider = current_provider()
+
+        # Decide: is this a logging statement or a question?
+        is_question = any(
+            prompt.strip().lower().startswith(q) for q in
+            ("what", "how", "when", "show", "why", "is ", "are ", "do ",
+             "does", "trend", "average", "avg", "list", "?")) \
+            or prompt.strip().endswith("?")
+
+        # LLM-assisted extraction when a provider is on; rule-based otherwise.
+        extracted = llm_extract(prompt, provider=provider, person=PERSON,
+                                source="chat") if provider.available() \
+            else extract_observations(prompt, person=PERSON, source="chat")
+
+        with st.chat_message("assistant"):
+            if extracted and not is_question:
+                result = store.add_observations(extracted)
+                lines = [f"Logged **{result['added']}** observation(s):"]
+                for e in extracted:
+                    lines.append(
+                        f"- {e['label']}: **{e['numericValue']} {e['unit']}** "
+                        f"→ `{e['type']}`")
+                if result["rejected"]:
+                    lines.append(f"\n_Rejected {result['rejected']}: "
+                                 f"{'; '.join(result['reasons'])}_")
+                reply = "\n".join(lines)
+                st.markdown(reply)
+                render_grounding(ground([e["metric"] for e in extracted]),
+                                 key="log")
+            else:
+                ans = answer_query(store.all_observations(), prompt,
+                                   provider=provider, person=PERSON)
+                reply = ans["explanation"]
+                if ans["used_llm"]:
+                    st.caption(f"↳ answered by {provider.name}, grounded in "
+                               "ontology")
+                st.markdown(reply)
+                for s in ans["summaries"]:
+                    df = series_dataframe(s)
+                    if not df.empty and len(df) > 1:
+                        st.line_chart(df)
+                render_grounding(ans["grounding"], key="qry")
+                st.session_state.chat.append(("assistant", reply))
+                st.stop()
+        st.session_state.chat.append(("assistant", reply))
+        st.rerun()
+
+
+# ---- Upload --------------------------------------------------------------- #
+with tab_upload:
+    st.subheader("Upload health reports")
+    st.caption("PDF, CSV, image (OCR), or text. Data is mapped to ontology "
+               "observations and appended to memory. Duplicates are detected.")
+
+    files = st.file_uploader(
+        "Choose file(s)", type=["pdf", "csv", "png", "jpg", "jpeg", "txt",
+                                "md", "tiff", "bmp"],
+        accept_multiple_files=True)
+
+    if files and st.button("Ingest files", type="primary"):
+        for f in files:
+            data = f.getvalue()
+            if store.seen_upload(data, f.name):
+                st.warning(f"⏭️ `{f.name}` looks like a duplicate — skipped.")
+                continue
+            try:
+                records, text = parse_file(f.name, data, person=PERSON)
+            except Exception as exc:
+                st.error(f"❌ `{f.name}`: {exc}")
+                continue
+            result = store.add_observations(records)
+            st.success(f"✅ `{f.name}`: added {result['added']} observation(s)"
+                       + (f", rejected {result['rejected']}"
+                          if result['rejected'] else ""))
+            if records:
+                st.dataframe(pd.DataFrame(records)[
+                    ["label", "numericValue", "unit", "type", "timestamp"]],
+                    use_container_width=True, hide_index=True)
+            with st.expander(f"Extracted text — {f.name}"):
+                st.text((text or "")[:4000])
+        st.rerun()
+
+
+# ---- Report --------------------------------------------------------------- #
+with tab_report:
+    st.subheader("Structured health report")
+    observations = store.all_observations()
+    if not observations:
+        st.info("No data yet. Log readings or upload a report first.")
+    else:
+        report = build_report(observations, person=PERSON)
+
+        top = st.columns(3)
+        top[0].metric("Observations", report["observation_count"])
+        top[1].metric("Metrics tracked", len(report["metrics"]))
+        top[2].metric("Anomalies", len(report["anomalies"]))
+
+        # Ontology-grounded LLM narrative (optional)
+        provider = current_provider()
+        if provider.available():
+            if st.button("🤖 Generate ontology-grounded narrative",
+                         type="secondary"):
+                from ontology.grounding import build_llm_context
+                facts = {g["title"]: [
+                    {"metric": s["label"],
+                     "ontology_class": REGISTRY[s["metric"]].ontology_class
+                     if s["metric"] in REGISTRY else None,
+                     "latest": s["latest"], "avg": s["avg"],
+                     "trend": s["trend"]["direction"],
+                     "anomalies": len(s["anomalies"])}
+                    for s in g["summaries"]] for g in report["groups"]}
+                system = build_llm_context(report["metrics"]) + (
+                    "\n\nTASK: Write a brief health-report narrative from the "
+                    "JSON facts. Group by condition, reference ontology "
+                    "classes and linked conditions, use association (not "
+                    "causal) language. Do not invent numbers.")
+                with st.spinner(f"Writing with {provider.name}…"):
+                    import json as _json
+                    res = provider.complete(system, _json.dumps(facts,
+                                                                default=str))
+                st.session_state["report_narrative"] = res.text
+            if st.session_state.get("report_narrative"):
+                st.markdown("### 📝 Narrative")
+                st.markdown(st.session_state["report_narrative"])
+
+        if report["insights"]:
+            st.markdown("### 💡 Key insights")
+            for i in report["insights"]:
+                st.markdown(f"- {i}")
+
+        with st.expander("🔗 Ontology grounding for this report"):
+            st.markdown(ground(report["metrics"]).as_markdown()
+                        or "_No classes matched._")
+
+        st.markdown("### 📈 Trends by condition")
+        for group in report["groups"]:
+            st.markdown(f"#### {group['title']}")
+            for s in group["summaries"]:
+                cols = st.columns([3, 1])
+                with cols[0]:
+                    df = series_dataframe(s)
+                    if not df.empty and len(df) > 1:
+                        st.line_chart(df, height=200)
+                    else:
+                        st.caption(f"{s['label']}: single reading "
+                                   f"{s['latest']} {s.get('unit') or ''}")
+                with cols[1]:
+                    unit = s.get("unit") or ""
+                    st.metric(s["label"], f"{s['latest']}{unit}",
+                              delta=f"{s['trend']['change']:+g}{unit}"
+                              if s["count"] > 1 else None)
+                    st.caption(f"avg {s['avg']} • n={s['count']}")
+
+        if report["correlations"]:
+            st.markdown("### 🔗 Correlations")
+            for c in report["correlations"]:
+                la = REGISTRY[c['metric_a']].label
+                lb = REGISTRY[c['metric_b']].label
+                st.markdown(f"- **{la} vs {lb}**: {c['strength']} "
+                            f"{c['direction']} (r={c['r']}, n={c['n']})")
+
+        if report["anomalies"]:
+            st.markdown("### ⚠️ Anomalies")
+            st.dataframe(pd.DataFrame(report["anomalies"]),
+                         use_container_width=True, hide_index=True)
+
+        md = report_to_markdown(report)
+        st.download_button("⬇️ Download report (Markdown)", md,
+                           file_name=f"health_report_"
+                           f"{datetime.now():%Y%m%d}.md")
+
+
+# ---- Memory --------------------------------------------------------------- #
+with tab_memory:
+    st.subheader("Ontology-aligned memory")
+    observations = store.all_observations()
+    st.caption("Append-only observation log. Every record is validated "
+               "against the ontology on write.")
+    if observations:
+        df = pd.DataFrame(observations)
+        show_cols = [c for c in ["timestamp", "label", "numericValue", "unit",
+                                 "type", "source", "id"] if c in df.columns]
+        st.dataframe(df[show_cols].sort_values("timestamp", ascending=False),
+                     use_container_width=True, hide_index=True)
+    else:
+        st.info("Memory is empty.")
+
+    with st.expander("Entities, relationships & memory assertions"):
+        st.write("**Entities**")
+        st.json(store.entities() or [])
+        st.write("**Relationships** (validated against property domain/range)")
+        st.json(store.relationships() or [])
+        st.write("**Memory assertions** (phm:MemoryAssertion)")
+        st.json(store.assertions() or [])
+
+    with st.expander("Ontology class hierarchy (Observation branch)"):
+        obs_classes = sorted(ontology.descendants("Observation"))
+        for c in obs_classes:
+            parents = ", ".join(sorted(ontology.subclass_of.get(c, []))) or "—"
+            st.write(f"- **{ontology.label(c)}** (`{c}`) ⊂ {parents}")
+
+    st.divider()
+    if st.button("🗑️ Reset memory (delete all data)"):
+        import shutil
+        shutil.rmtree("data", ignore_errors=True)
+        st.cache_resource.clear()
+        st.session_state.chat = []
+        st.rerun()

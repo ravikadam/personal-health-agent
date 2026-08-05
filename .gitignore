@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.DS_Store
+.streamlit/secrets.toml
+
+# Local memory — keep the folder + sample data, ignore the generated store
+data/*.json
+data/*.json.tmp
+data/*.db
+data/*.db-journal
+data/*.db-wal
+!data/.gitkeep
+!data/sample_labs.csv
+
+# Local Claude Code settings
+.claude/settings.local.json

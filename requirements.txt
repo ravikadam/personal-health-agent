@@ -1,0 +1,20 @@
+# Core (required)
+streamlit>=1.32
+rdflib>=7.0
+pandas>=2.0
+
+# File ingestion (optional but recommended)
+pdfplumber>=0.10        # PDF report parsing
+
+# Optional OCR for image reports — also needs the `tesseract` binary installed
+pytesseract>=0.3.10
+Pillow>=10.0
+
+# Optional LLM providers — install only the one(s) you want to offer.
+# The app is provider-agnostic; users pick one in the sidebar and supply a key.
+openai>=1.30              # OpenAI  (OPENAI_API_KEY)
+anthropic>=0.40          # Claude  (ANTHROPIC_API_KEY)
+google-generativeai>=0.7 # Gemini  (GEMINI_API_KEY / GOOGLE_API_KEY)
+
+# Note: vitals are stored in SQLite (data/health.db) via the Python stdlib
+# `sqlite3` module — no extra dependency required.
