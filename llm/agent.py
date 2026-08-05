@@ -62,8 +62,12 @@ def understand(message: str, provider, metrics: List[str]) -> Optional[Dict]:
         '  "intent": "log" | "query" | "mixed" | "chat",\n'
         '  "observations": [{"metric": one of the known metrics, '
         '"value": number, "unit": string, "timestamp": ISO8601 optional}],\n'
-        '  "memory_facts": [{"kind": "condition"|"medication", "name": string, '
-        '"ontology_class": a phm class, "predicate": e.g. hasCondition}],\n'
+        '  "memory_facts": [{"kind": '
+        '"condition"|"medication"|"allergy"|"diet"|"lifestyle"|"risk_factor"'
+        '|"goal"|"family_history"|"profile"|"other", "name": string, '
+        '"ontology_class": best-fit phm class, "predicate": best-fit phm object '
+        'property, "value": optional string or number, "note": optional short '
+        'string}],\n'
         f'  "query": {{"metrics": [known metrics], "ontology_types": [phm '
         f'classes], "time_window": one of {sorted(TIME_WINDOWS)}, "analysis": '
         '"latest"|"average"|"trend"|"anomaly"|"correlation", "correlate_with": '
@@ -73,10 +77,15 @@ def understand(message: str, provider, metrics: List[str]) -> Optional[Dict]:
         '  "response_style": "brief" | "detailed"\n'
         "}\n"
         f"Known metrics: {', '.join(metrics)}.\n"
-        "Rules: only use listed metrics; if the user reports numbers it's a "
-        "'log' (or 'mixed' if they also ask something); pick a chart only when "
-        "a trend/comparison over time helps, else type 'none'. Return JSON "
-        "only, no prose."
+        "Rules: only use listed metrics for observations; if the user reports "
+        "numbers it's a 'log' (or 'mixed' if they also ask something); pick a "
+        "chart only when a trend/comparison over time helps, else 'none'. "
+        "IMPORTANT — memory_facts: capture ANY durable personal or health fact "
+        "worth remembering long-term, not just numbers — who they are (name, "
+        "age, sex), chronic conditions, medications, allergies, dietary "
+        "pattern, lifestyle/habits, family history, and goals. Map each to the "
+        "best-fit phm ontology class and object property. Ignore transient "
+        "small talk. Return JSON only, no prose."
     )
     plan = provider.extract_json(system, message)
     if not isinstance(plan, dict) or "intent" not in plan:

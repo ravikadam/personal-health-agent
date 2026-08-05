@@ -149,6 +149,13 @@ with st.sidebar:
         st.warning(f"Install the SDK: `pip install {_PKG.get(provider, provider)}`")
     elif prov.available():
         st.success(f"🟢 {labels.get(provider)} ready ({model})")
+        if st.button("🔍 Test LLM connection"):
+            try:
+                r = prov.complete("You are a connectivity test. Reply with "
+                                  "exactly: OK", "ping")
+                st.success(f"Response: {r.text[:120] or '(empty)'}")
+            except Exception as exc:  # surface the real, otherwise-swallowed error
+                st.error(f"LLM call failed:\n\n{type(exc).__name__}: {exc}")
     else:
         st.info("Add an API key to enable this provider.")
 
@@ -203,12 +210,18 @@ with tab_chat:
                 st.markdown(block)
                 reply_parts.append(block)
 
-            # Memory facts (conditions / medications the LLM understood)
+            # Memory facts (anything durable the LLM decided to remember)
             mem = turn.get("memory")
-            if mem and (mem.get("entities")):
-                names = ", ".join(f"**{e['name']}** (`{e['type']}`)"
-                                  for e in mem["entities"])
-                block = f"🧠 Updated memory: {names}"
+            if mem and mem.get("entities"):
+                preds = {(a["object"] or "").lower(): a["predicate"]
+                         for a in mem.get("assertions", [])}
+                lines = ["🧠 Remembered:"]
+                for e in mem["entities"]:
+                    pred = preds.get(e["name"].lower())
+                    via = f" · `self {pred}`" if pred else ""
+                    extra = f" — {e.get('note')}" if e.get("note") else ""
+                    lines.append(f"- **{e['name']}** (`{e['type']}`){via}{extra}")
+                block = "\n".join(lines)
                 st.markdown(block)
                 reply_parts.append(block)
 

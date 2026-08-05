@@ -174,6 +174,21 @@ def build_llm_context(metrics: Optional[List[str]] = None,
             lines.append(f"  - {info.name}: {info.domain or '—'} → "
                          f"{info.range or '—'}  ({info.label})")
 
+    # Vocabulary for remembering general profile / situation (not just vitals)
+    lines += ["", "PROFILE / MEMORY VOCABULARY (for durable personal facts):"]
+    for cls in ("Person", "ChronicCondition", "Comorbidity", "Medication",
+                "Contraindication", "DietaryPattern", "RiskFactor",
+                "FunctionalLimitation", "HealthGoal", "Barrier", "Facilitator"):
+        if ont.is_class(cls):
+            lines.append(f"  - {cls} ({ont.label(cls)})")
+    for p in ("hasCondition", "hasComorbidity", "usesMedication",
+              "hasRiskFactor", "hasContraindication", "hasBarrier",
+              "hasFacilitator", "pursuesGoal", "goalForPerson"):
+        info = ont.object_properties.get(p)
+        if info:
+            lines.append(f"  - property {info.name}: {info.domain or '—'} → "
+                         f"{info.range or '—'}")
+
     if metrics:
         lines += ["", "CONDITION LINKS FOR THIS CONTEXT:"]
         from ingestion.metrics import REGISTRY

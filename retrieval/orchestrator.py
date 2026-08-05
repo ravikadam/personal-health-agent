@@ -46,11 +46,19 @@ def _planned_turn(store, message: str, plan: Dict, provider) -> Dict:
                     "answer": None}
     intent = plan.get("intent", "chat")
 
-    if intent in ("log", "mixed"):
+    # Persist whatever the LLM extracted, regardless of intent label: numeric
+    # readings AND memory facts (conditions/medications). A pure statement like
+    # "I'm diabetic and have BP issues" carries no numbers but must still update
+    # memory.
+    if plan.get("observations"):
         result["logged"] = _log_from_plan(store, message, plan)
+    if plan.get("memory_facts"):
         result["memory"] = _apply_memory_facts(store, plan)
 
-    if intent in ("query", "mixed", "chat"):
+    # Compose an answer for questions, or when the turn was purely
+    # conversational with nothing to store.
+    nothing_stored = not (result["logged"] or result["memory"])
+    if intent in ("query", "mixed") or (intent == "chat" and nothing_stored):
         result["answer"] = _answer_from_plan(store, message, plan, provider)
 
     return result
@@ -76,29 +84,63 @@ def _log_from_plan(store, message: str, plan: Dict) -> Dict:
     return res
 
 
+# Sensible ontology fallbacks per fact kind: (class, object property).
+_KIND_DEFAULTS = {
+    "condition": ("ChronicCondition", "hasCondition"),
+    "medication": ("Medication", "usesMedication"),
+    "allergy": ("Contraindication", "hasContraindication"),
+    "diet": ("DietaryPattern", "hasFacilitator"),
+    "lifestyle": ("HealthConcept", "hasFacilitator"),
+    "risk_factor": ("RiskFactor", "hasRiskFactor"),
+    "family_history": ("RiskFactor", "hasRiskFactor"),
+    "goal": ("HealthGoal", "pursuesGoal"),
+    "profile": ("Person", "assertionSubject"),
+    "other": ("HealthConcept", "assertionPredicate"),
+}
+
+
 def _apply_memory_facts(store, plan: Dict) -> Dict:
-    """Persist LLM-extracted conditions/medications as ontology entities +
-    provenance-bearing MemoryAssertions."""
+    """Persist ANY durable LLM-extracted fact (conditions, meds, allergies,
+    diet, lifestyle, goals, profile, ...) as ontology entities + provenance-
+    bearing MemoryAssertions. Falls back to a sensible class/property per kind
+    when the LLM's suggestion isn't a known ontology term."""
     from ontology.ontology_loader import load_ontology
     ont = load_ontology()
+    existing = {(a["predicate"], (a["object"] or "").lower())
+                for a in store.assertions()}
     entities, assertions = [], []
+
     for fact in plan.get("memory_facts", []):
-        name = fact.get("name")
+        name = (fact.get("name") or "").strip()
         if not name:
             continue
-        cls = fact.get("ontology_class") or (
-            "Medication" if fact.get("kind") == "medication"
-            else "ChronicCondition")
-        if not ont.is_class(cls):
-            cls = "Medication" if fact.get("kind") == "medication" \
-                else "HealthCondition"
-        ent = store.add_entity(cls, name)
+        kind = fact.get("kind", "other")
+        def_cls, def_pred = _KIND_DEFAULTS.get(kind, _KIND_DEFAULTS["other"])
+
+        cls = fact.get("ontology_class")
+        if not cls or not ont.is_class(cls):
+            cls = def_cls
+        predicate = fact.get("predicate")
+        if not predicate or predicate not in ont.object_properties:
+            predicate = def_pred
+
+        attrs = {}
+        if fact.get("value") not in (None, ""):
+            attrs["value"] = fact["value"]
+        if fact.get("note"):
+            attrs["note"] = fact["note"]
+        ent = store.add_entity(cls, name, kind=kind, **attrs)
         entities.append(ent)
-        predicate = fact.get("predicate") or (
-            "usesMedication" if fact.get("kind") == "medication"
-            else "hasCondition")
-        assertions.append(
-            store.add_assertion("self", predicate, name, status="Candidate"))
+
+        if (predicate, name.lower()) not in existing:
+            note_bits = [b for b in (fact.get("note"),
+                         f"value={fact['value']}" if fact.get("value")
+                         not in (None, "") else None) if b]
+            assertions.append(store.add_assertion(
+                "self", predicate, name, status="Candidate",
+                evidence=note_bits))
+            existing.add((predicate, name.lower()))
+
     return {"entities": entities, "assertions": assertions}
 
 
