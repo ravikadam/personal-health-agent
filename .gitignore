@@ -17,3 +17,6 @@ data/*.db-wal
 
 # Local Claude Code settings
 .claude/settings.local.json
+
+# stray local render previews
+scratchpad_*.png
