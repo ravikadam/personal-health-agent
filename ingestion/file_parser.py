@@ -51,19 +51,86 @@ def parse_file(filename: str, data: bytes, person: str = "self",
 
 def _extract(text: str, person: str, filename: str,
              timestamp: Optional[str], provider) -> List[Dict]:
-    """Merge LLM document extraction (if available) with regex extraction."""
-    records = _from_text(text, person, filename, timestamp)
+    """Extract observations from report text.
+
+    Preferred path (when an LLM is available): parse the report's result
+    *tables* into structured lab rows (any analyte, with reference ranges and
+    H/L flags), ignoring threshold/footnote text. This is far more reliable on
+    dense pathology PDFs than line-by-line regex. Falls back to regex metric
+    extraction only when no lab rows are found or no provider is set.
+    """
     if provider is not None and getattr(provider, "available",
                                         lambda: False)():
-        from llm.agent import extract_document
-        from ingestion.metrics import REGISTRY
-        llm_records = extract_document(text, provider, list(REGISTRY.keys()),
-                                       person=person, source=f"file:{filename}")
-        if llm_records:
-            seen = {(r["metric"], r["numericValue"]) for r in records}
-            for r in llm_records:
-                if (r["metric"], r["numericValue"]) not in seen:
-                    records.append(r)
+        from llm.agent import extract_lab_report
+        labs = extract_lab_report(text, provider)
+        if labs:
+            return _labs_to_records(labs, person, f"file:{filename}", timestamp)
+    # Fallback: chat-style regex extraction of the known metrics.
+    return _from_text(text, person, filename, timestamp)
+
+
+def _labs_to_records(labs: List[Dict], person: str, source: str,
+                     timestamp: Optional[str]) -> List[Dict]:
+    """Convert extracted lab rows into ontology-aligned observation records.
+
+    A row that maps to a tracked metric (glucose, HbA1c, ...) becomes that
+    metric's specific observation class so it flows into trends/reports; every
+    other analyte becomes a generic phm:LaboratoryObservation carrying the
+    report's own reference range and abnormal flag.
+    """
+    from ingestion.metrics import (REGISTRY, detect_context, normalize_unit,
+                                    resolve_lab_metric)
+    from datetime import datetime
+
+    def num(x):
+        try:
+            return float(x)
+        except (TypeError, ValueError):
+            return None
+
+    records: List[Dict] = []
+    for it in labs:
+        test = str(it.get("test") or "").strip()
+        value = num(it.get("value"))
+        if not test or value is None:
+            continue
+        unit = it.get("unit")
+        ts = it.get("collected") or timestamp or datetime.utcnow().isoformat()
+        low, high = num(it.get("ref_low")), num(it.get("ref_high"))
+        flag = (it.get("flag") or "").strip().upper() or None
+        if flag not in ("H", "L", None):
+            flag = None
+        # infer flag from range if the report didn't print one
+        if flag is None and (low is not None or high is not None):
+            if low is not None and value < low:
+                flag = "L"
+            elif high is not None and value > high:
+                flag = "H"
+
+        metric = resolve_lab_metric(test)
+        if metric:
+            norm_v, norm_u = normalize_unit(metric, value, unit)
+            mdef = REGISTRY[metric]
+            rec = {
+                "metric": metric, "type": mdef.ontology_class,
+                "label": mdef.label, "category": mdef.category,
+                "numericValue": norm_v, "unit": norm_u,
+                "context": detect_context(test),
+            }
+        else:
+            rec = {
+                "metric": None, "type": "LaboratoryObservation",
+                "label": test, "category": "lab",
+                "numericValue": value, "unit": unit, "context": None,
+            }
+        rec.update({
+            "observedFor": person, "source": source, "timestamp": ts,
+            "raw_text": (f"{test} {value} {unit or ''}"
+                         f" (ref {it.get('ref_text') or ''})").strip()[:280],
+            "ref_low": low, "ref_high": high,
+            "ref_text": it.get("ref_text"), "abnormal_flag": flag,
+        })
+        records.append(rec)
     return records
 
 

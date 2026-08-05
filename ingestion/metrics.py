@@ -213,6 +213,22 @@ def detect_context(text: str):
     return None
 
 
+def resolve_lab_metric(test_name: str):
+    """Map a lab-report analyte name to one of the app's tracked metric keys,
+    or None if it isn't one we model (e.g. Haemoglobin, Creatinine).
+
+    Matches synonyms on WORD boundaries so short codes like "hr" don't match
+    inside unrelated words (e.g. "eryt-hr-ocyte" -> heart rate)."""
+    import re
+    name = (test_name or "").lower().strip()
+    if not name:
+        return None
+    for syn, key in synonym_index():          # longest synonyms first
+        if re.search(r"\b" + re.escape(syn) + r"\b", name):
+            return key
+    return None
+
+
 def classify_severity(metric: str, value):
     """Tier a value against clinical thresholds. Returns a dict with level
     (none|caution|urgent), direction, a clinical name and the ontology class

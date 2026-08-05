@@ -340,6 +340,31 @@ with tab_report:
         top[1].metric("Metrics tracked", len(report["metrics"]))
         top[2].metric("Anomalies", len(report["anomalies"]))
 
+        # Lab panel — generic LaboratoryObservations from uploaded reports,
+        # abnormal (H/L) first, with the report's own reference ranges.
+        labs = [o for o in observations
+                if o.get("type") == "LaboratoryObservation"
+                or o.get("category") == "lab"]
+        if labs:
+            labs.sort(key=lambda o: (o.get("abnormal_flag") is None,
+                                     o.get("label") or ""))
+            n_abn = sum(1 for o in labs if o.get("abnormal_flag"))
+            st.markdown(f"### 🧪 Lab results ({len(labs)} analytes, "
+                        f"**{n_abn} abnormal**)")
+            lab_df = pd.DataFrame([{
+                "Flag": ("🔴 " + o["abnormal_flag"]) if o.get("abnormal_flag")
+                else "✅",
+                "Test": o.get("label"),
+                "Value": o.get("numericValue"),
+                "Unit": o.get("unit"),
+                "Reference": o.get("ref_text")
+                or (f"{o.get('ref_low')}–{o.get('ref_high')}"
+                    if o.get("ref_low") is not None else ""),
+                "Class": o.get("type"),
+                "Date": (o.get("timestamp") or "")[:10],
+            } for o in labs])
+            st.dataframe(lab_df, use_container_width=True, hide_index=True)
+
         # Ontology-grounded LLM narrative (optional)
         provider = current_provider()
         if provider.available():

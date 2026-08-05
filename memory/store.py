@@ -95,7 +95,8 @@ CREATE TABLE IF NOT EXISTS uploads (
 _OBS_COLS = ["id", "ontology_class", "metric", "label", "category",
              "numeric_value", "unit", "text_value", "observed_for", "source",
              "timestamp", "recorded_at", "raw_text", "linked_to", "supersedes",
-             "confidence", "context"]
+             "confidence", "context", "ref_low", "ref_high", "ref_text",
+             "abnormal_flag"]
 
 
 class MemoryStore:
@@ -110,8 +111,12 @@ class MemoryStore:
             # Lightweight migration: add columns introduced after first release.
             cols = {r[1] for r in con.execute(
                 "PRAGMA table_info(observations)")}
-            if "context" not in cols:
-                con.execute("ALTER TABLE observations ADD COLUMN context TEXT")
+            for col, decl in (("context", "TEXT"), ("ref_low", "REAL"),
+                              ("ref_high", "REAL"), ("ref_text", "TEXT"),
+                              ("abnormal_flag", "TEXT")):
+                if col not in cols:
+                    con.execute(
+                        f"ALTER TABLE observations ADD COLUMN {col} {decl}")
 
     def _connect(self) -> sqlite3.Connection:
         con = sqlite3.connect(self.db_path)
@@ -157,6 +162,10 @@ class MemoryStore:
                     "supersedes": rec.get("supersedes"),
                     "confidence": rec.get("confidence", 1.0),
                     "context": rec.get("context"),
+                    "ref_low": rec.get("ref_low"),
+                    "ref_high": rec.get("ref_high"),
+                    "ref_text": rec.get("ref_text"),
+                    "abnormal_flag": rec.get("abnormal_flag"),
                 }
                 con.execute(
                     f"INSERT INTO observations ({','.join(_OBS_COLS)}) "
@@ -186,6 +195,11 @@ class MemoryStore:
             "supersedes": row["supersedes"],
             "confidence": row["confidence"],
             "context": row["context"] if "context" in row.keys() else None,
+            "ref_low": row["ref_low"] if "ref_low" in row.keys() else None,
+            "ref_high": row["ref_high"] if "ref_high" in row.keys() else None,
+            "ref_text": row["ref_text"] if "ref_text" in row.keys() else None,
+            "abnormal_flag": (row["abnormal_flag"]
+                              if "abnormal_flag" in row.keys() else None),
         }
 
     def all_observations(self) -> List[Dict]:

@@ -187,6 +187,58 @@ def extract_document(text: str, provider, metrics: List[str],
     return out or None
 
 
+def extract_lab_report(text: str, provider) -> Optional[List[Dict]]:
+    """Extract the ACTUAL result rows from a pathology/lab report's tables.
+
+    Returns a list of {test, value, unit, ref_low, ref_high, ref_text, flag,
+    collected} dicts — any analyte, not just the app's tracked metrics. The
+    prompt is strict about ignoring reference thresholds, diagnostic criteria,
+    method notes and explanatory paragraphs, which is what caused earlier
+    line-by-line extraction to grab garbage. None on failure/empty.
+    """
+    if provider is None or not getattr(provider, "available",
+                                       lambda: False)():
+        return None
+    if not text or not text.strip():
+        return None
+    system = (
+        "You extract structured results from a clinical laboratory report. "
+        "Return ONLY a JSON array. For EACH analyte that is an actual measured "
+        "result for THIS patient, output an object with keys: "
+        "test (string, the analyte name), value (number), unit (string), "
+        "ref_low (number or null), ref_high (number or null), ref_text (string "
+        "of the reference interval as printed, or null), flag ('H'|'L'|'' as "
+        "printed), collected (ISO date if a collection/report date is present, "
+        "else null).\n"
+        "STRICT RULES: Include only the patient's own measured results from the "
+        "result tables. DO NOT include: diagnostic cut-offs or criteria from "
+        "explanatory text (e.g. 'fasting >=126 = diabetes'), reference ranges "
+        "as if they were results, method descriptions, footnotes, headers, page "
+        "numbers, addresses, phone numbers, IDs, or interpretive prose. If a "
+        "value is not a real measured result, omit it. Numbers only for value/"
+        "ref_low/ref_high (no comparison symbols)."
+    )
+    # Lab tables are long; a small token budget truncates the JSON and it fails
+    # to parse. Temporarily raise the ceiling for this call.
+    old_max = provider.config.max_tokens
+    provider.config.max_tokens = max(old_max, 8000)
+    try:
+        payload = provider.extract_json(system, text[:12000])
+    finally:
+        provider.config.max_tokens = old_max
+    if not isinstance(payload, list):
+        return None
+    clean = []
+    for it in payload:
+        try:
+            if it.get("test") and it.get("value") is not None:
+                float(it["value"])
+                clean.append(it)
+        except (TypeError, ValueError):
+            continue
+    return clean or None
+
+
 # --------------------------------------------------------------------------- #
 # 3. Compose the final answer from computed facts
 # --------------------------------------------------------------------------- #
