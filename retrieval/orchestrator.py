@@ -170,13 +170,18 @@ def _answer_from_plan(store, message: str, plan: Dict, provider) -> Dict:
         correlation = correlate(observations, eff_metrics[0],
                                 q["correlate_with"])
 
-    grounding = ground(eff_metrics, ont_types)
-    facts = _facts_payload(hits, summaries, correlation)
+    # Pull the person's stored profile (conditions, meds, allergies, diet,
+    # goals, risk factors) so the answer is grounded in semantic memory, not
+    # just numeric observations.
+    profile = _profile_payload(store)
+    profile_classes = list(profile.keys())
+    grounding = ground(eff_metrics, ont_types + profile_classes)
+    facts = _facts_payload(hits, summaries, correlation, profile)
 
     explanation = agent.compose_answer(message, facts, provider, eff_metrics)
     used_llm = explanation is not None
     if not explanation:
-        explanation = _rule_explanation(spec, hits, summaries)
+        explanation = _rule_explanation(spec, hits, summaries, profile)
 
     chart = _resolve_chart(plan.get("chart") or {}, summaries)
     return {"explanation": explanation, "summaries": summaries, "hits": hits,
@@ -206,9 +211,10 @@ def _rule_based_turn(store, message: str, provider) -> Dict:
     metrics = spec.metrics or sorted({h["metric"] for h in hits
                                       if h.get("metric")})
     summaries = [s for s in (aggregate(hits, m) for m in metrics) if s]
-    grounding = ground(metrics, spec.ontology_types)
+    profile = _profile_payload(store)
+    grounding = ground(metrics, spec.ontology_types + list(profile.keys()))
     answer = {
-        "explanation": _rule_explanation(spec, hits, summaries),
+        "explanation": _rule_explanation(spec, hits, summaries, profile),
         "summaries": summaries, "hits": hits, "grounding": grounding,
         "chart": _resolve_chart({"type": "line"}, summaries),
         "correlation": None, "used_llm": False,
@@ -220,9 +226,28 @@ def _rule_based_turn(store, message: str, provider) -> Dict:
 # --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #
+def _profile_payload(store) -> Dict:
+    """The person's durable memory (conditions, meds, allergies, diet, goals,
+    risk factors) grouped by ontology class, for grounding answers."""
+    pred_by_obj = {(a.get("object") or "").lower(): a.get("predicate")
+                   for a in store.assertions()}
+    profile: Dict[str, List[Dict]] = {}
+    for e in store.entities():
+        item = {"name": e["name"],
+                "predicate": pred_by_obj.get(e["name"].lower())}
+        if e.get("note"):
+            item["note"] = e["note"]
+        if e.get("value") not in (None, ""):
+            item["value"] = e.get("value")
+        profile.setdefault(e["type"], []).append(item)
+    return profile
+
+
 def _facts_payload(hits: List[Dict], summaries: List[Dict],
-                   correlation: Optional[Dict]) -> Dict:
+                   correlation: Optional[Dict],
+                   profile: Optional[Dict] = None) -> Dict:
     return {
+        "person_profile": profile or {},
         "record_count": len(hits),
         "summaries": [
             {
@@ -241,10 +266,18 @@ def _facts_payload(hits: List[Dict], summaries: List[Dict],
 
 
 def _rule_explanation(spec: QuerySpec, hits: List[Dict],
-                      summaries: List[Dict]) -> str:
+                      summaries: List[Dict],
+                      profile: Optional[Dict] = None) -> str:
+    prefix = ""
+    if profile:
+        conds = [i["name"] for cls, items in profile.items()
+                 for i in items if "Condition" in cls]
+        if conds:
+            prefix = f"On file: {', '.join(conds)}.\n"
     if not hits:
-        return ("No matching records yet. Try logging a reading first, e.g. "
-                "\"glucose 120 mg/dL\".")
+        base = ("No matching observations for that window. Log a reading (e.g. "
+                "\"glucose 120 mg/dL\") for a data-grounded answer.")
+        return prefix + base if prefix else base
     parts = [f"Found {len(hits)} matching record(s)"
              + (f" since {spec.since.date()}" if spec.since else "") + "."]
     for s in summaries:
@@ -253,7 +286,7 @@ def _rule_explanation(spec: QuerySpec, hits: List[Dict],
                      f"{s['avg']}{unit}, min {s['min']}, max {s['max']}, "
                      f"{s['count']} readings, trend {s['trend']['direction']}).")
     parts.extend(insights(summaries))
-    return "\n".join(parts)
+    return prefix + "\n".join(parts)
 
 
 def _resolve_chart(chart_spec: Dict, summaries: List[Dict]) -> Optional[Dict]:

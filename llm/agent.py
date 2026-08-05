@@ -175,11 +175,15 @@ def compose_answer(question: str, facts: Dict, provider,
         return None
     try:
         system = build_llm_context(metrics) + (
-            "\n\nTASK: Answer the user's health question using ONLY the JSON "
-            "facts (they are already computed — never change or invent a "
-            "number). Reference the relevant ontology class and any linked "
-            "condition. Use association, not causal, language. Keep it to the "
-            "requested style; default 3-6 sentences.")
+            "\n\nTASK: Answer the user's health question using the JSON facts. "
+            "`person_profile` holds durable memory (conditions, medications, "
+            "allergies, dietary pattern, goals, risk factors) mapped to phm "
+            "classes — USE it to personalise the answer (e.g. a ChronicCondition "
+            "like diabetes and a HealthGoal shape dietary guidance). `summaries` "
+            "are computed observation stats — never change or invent a number. "
+            "Reference the relevant ontology classes/conditions. Use "
+            "association, not causal, language, and add a brief 'not medical "
+            "advice' note when giving guidance. Default 3-6 sentences.")
         user = (f"Question: {question}\n\nFacts (JSON):\n"
                 f"{json.dumps(facts, default=str)}")
         res = provider.complete(system, user)
