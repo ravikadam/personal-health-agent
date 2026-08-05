@@ -14,7 +14,6 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
-from ingestion.extractor import extract_observations, llm_extract
 from ingestion.file_parser import parse_file
 from ingestion.metrics import REGISTRY
 from llm import (DEFAULT_MODELS, MODEL_CHOICES, LLMConfig, default_config,
@@ -24,7 +23,7 @@ from ontology.grounding import ground
 from ontology.ontology_loader import load_ontology
 from reports.generator import (build_report, report_to_markdown,
                                series_dataframe)
-from retrieval.query import answer_query
+from retrieval.orchestrator import handle_turn
 
 st.set_page_config(page_title="Personal Health Agent", page_icon="🩺",
                    layout="wide")
@@ -62,6 +61,26 @@ def render_grounding(grounding, key: str):
         st.caption("Every answer is anchored to these ontology classes, "
                    "hierarchy paths and relationships.")
         st.markdown(grounding.as_markdown() or "_No classes matched._")
+
+
+def render_chart(chart):
+    """Render the chart the agent chose (line / bar / scatter)."""
+    if not chart or not chart.get("summaries"):
+        return
+    frames = [series_dataframe(s) for s in chart["summaries"]]
+    frames = [f for f in frames if not f.empty]
+    if not frames:
+        return
+    df = pd.concat(frames, axis=1)
+    if chart.get("title"):
+        st.caption(f"📊 {chart['title']}")
+    ctype = chart.get("type", "line")
+    if ctype == "bar":
+        st.bar_chart(df, height=240)
+    elif ctype == "scatter" and df.shape[1] >= 2:
+        st.scatter_chart(df, height=240)
+    else:
+        st.line_chart(df, height=240)
 
 
 # --------------------------------------------------------------------------- #
@@ -162,50 +181,61 @@ with tab_chat:
             st.markdown(prompt)
 
         provider = current_provider()
-
-        # Decide: is this a logging statement or a question?
-        is_question = any(
-            prompt.strip().lower().startswith(q) for q in
-            ("what", "how", "when", "show", "why", "is ", "are ", "do ",
-             "does", "trend", "average", "avg", "list", "?")) \
-            or prompt.strip().endswith("?")
-
-        # LLM-assisted extraction when a provider is on; rule-based otherwise.
-        extracted = llm_extract(prompt, provider=provider, person=PERSON,
-                                source="chat") if provider.available() \
-            else extract_observations(prompt, person=PERSON, source="chat")
+        turn = handle_turn(store, prompt, provider)
+        reply_parts = []
 
         with st.chat_message("assistant"):
-            if extracted and not is_question:
-                result = store.add_observations(extracted)
-                lines = [f"Logged **{result['added']}** observation(s):"]
-                for e in extracted:
-                    lines.append(
-                        f"- {e['label']}: **{e['numericValue']} {e['unit']}** "
-                        f"→ `{e['type']}`")
-                if result["rejected"]:
-                    lines.append(f"\n_Rejected {result['rejected']}: "
-                                 f"{'; '.join(result['reasons'])}_")
-                reply = "\n".join(lines)
-                st.markdown(reply)
-                render_grounding(ground([e["metric"] for e in extracted]),
-                                 key="log")
-            else:
-                ans = answer_query(store.all_observations(), prompt,
-                                   provider=provider, person=PERSON)
-                reply = ans["explanation"]
-                if ans["used_llm"]:
-                    st.caption(f"↳ answered by {provider.name}, grounded in "
-                               "ontology")
-                st.markdown(reply)
-                for s in ans["summaries"]:
-                    df = series_dataframe(s)
-                    if not df.empty and len(df) > 1:
-                        st.line_chart(df)
+            if turn.get("used_llm"):
+                st.caption(f"↳ understood & answered by {provider.name}, "
+                           f"grounded in the ontology (intent: {turn['mode']})")
+
+            # Logged observations
+            logged = turn.get("logged")
+            if logged and logged.get("records"):
+                lines = [f"Logged **{logged['added']}** observation(s):"]
+                for e in logged["records"]:
+                    lines.append(f"- {e['label']}: **{e['numericValue']} "
+                                 f"{e['unit']}** → `{e['type']}`")
+                if logged.get("rejected"):
+                    lines.append(f"\n_Rejected {logged['rejected']}: "
+                                 f"{'; '.join(logged['reasons'])}_")
+                block = "\n".join(lines)
+                st.markdown(block)
+                reply_parts.append(block)
+
+            # Memory facts (conditions / medications the LLM understood)
+            mem = turn.get("memory")
+            if mem and (mem.get("entities")):
+                names = ", ".join(f"**{e['name']}** (`{e['type']}`)"
+                                  for e in mem["entities"])
+                block = f"🧠 Updated memory: {names}"
+                st.markdown(block)
+                reply_parts.append(block)
+
+            # Answer to a question
+            ans = turn.get("answer")
+            if ans:
+                st.markdown(ans["explanation"])
+                reply_parts.append(ans["explanation"])
+                render_chart(ans.get("chart"))
+                if ans.get("correlation"):
+                    c = ans["correlation"]
+                    st.caption(f"Correlation r={c['r']} ({c['strength']} "
+                               f"{c['direction']}, n={c['n']}).")
                 render_grounding(ans["grounding"], key="qry")
-                st.session_state.chat.append(("assistant", reply))
-                st.stop()
-        st.session_state.chat.append(("assistant", reply))
+            elif logged:
+                render_grounding(
+                    ground([r["metric"] for r in logged["records"]]),
+                    key="log")
+
+            if not reply_parts:
+                fallback = ("I didn't catch a reading or a question there. "
+                            "Try “glucose 130 mg/dL” or “glucose trend last "
+                            "7 days?”.")
+                st.markdown(fallback)
+                reply_parts.append(fallback)
+
+        st.session_state.chat.append(("assistant", "\n\n".join(reply_parts)))
         st.rerun()
 
 
@@ -214,6 +244,10 @@ with tab_upload:
     st.subheader("Upload health reports")
     st.caption("PDF, CSV, image (OCR), or text. Data is mapped to ontology "
                "observations and appended to memory. Duplicates are detected.")
+
+    upload_provider = current_provider()
+    if upload_provider.available():
+        st.caption(f"🤖 {upload_provider.name} will help read report text.")
 
     files = st.file_uploader(
         "Choose file(s)", type=["pdf", "csv", "png", "jpg", "jpeg", "txt",
@@ -227,7 +261,8 @@ with tab_upload:
                 st.warning(f"⏭️ `{f.name}` looks like a duplicate — skipped.")
                 continue
             try:
-                records, text = parse_file(f.name, data, person=PERSON)
+                records, text = parse_file(f.name, data, person=PERSON,
+                                           provider=upload_provider)
             except Exception as exc:
                 st.error(f"❌ `{f.name}`: {exc}")
                 continue

@@ -71,20 +71,46 @@ llm/
   base.py                  LLMProvider interface + LLMConfig (vendor-neutral)
   providers.py             OpenAI / Anthropic / Gemini / Null adapters
   factory.py               Provider selection, default models, env keys
+  agent.py                 LLM understanding: intent, doc extraction, compose
 ingestion/
   metrics.py               Metric registry: ontology class, units, synonyms, ranges
   extractor.py             Rule-based (regex) + optional LLM text → observations
-  file_parser.py           PDF / CSV / image / text → observations; dup hashing
+  file_parser.py           PDF / CSV / image / text → observations (LLM-assisted)
 memory/
   store.py                 SQLite store, ontology-governed writes, assertions
 retrieval/
   retriever.py             NL query → metric/type/time filter; ontology-aware
+  orchestrator.py          Plan-then-act: LLM plan → deterministic execution
   query.py                 Retrieval + reasoning + grounding → explained answer
 reports/
   reasoning.py             Aggregates, trends, anomalies, correlations
   generator.py             Structured report + Markdown + chart dataframes
 data/                      Local memory (health.db SQLite)
 tests/smoke_test.py        Full-pipeline check (no Streamlit)
+```
+
+### How the LLM is used (actively, end-to-end)
+
+When a provider is selected, the LLM drives the whole turn — not just a final
+summary. `llm/agent.py` + `retrieval/orchestrator.py` implement a plan-then-act
+loop where **the model decides intent and structure, but all numbers are
+computed in code** so nothing is hallucinated:
+
+| Stage | What the LLM does |
+|-------|-------------------|
+| **Understand chat** | Classifies the turn (log / query / mixed), pulls metric-value-unit-time, and extracts memory facts (conditions, medications) — as ontology-typed JSON. |
+| **Update memory** | Those facts become ontology `entities` + `MemoryAssertion`s (e.g. `self hasCondition "Diabetes mellitus"`), beyond just numeric vitals. |
+| **Parse files** | Reads PDF/report text and extracts measurements the regex layer misses (e.g. HbA1c from a lab PDF), merged with rule-based extraction. |
+| **Understand queries** | Interprets which metrics, time window, and analysis (trend / average / anomaly / correlation) the question needs. |
+| **Respond with memory** | Composes the answer from the *retrieved, already-computed* facts, in ontology language, with association (not causal) wording. |
+| **Design charts** | Chooses chart type (line / bar / scatter) and which metrics to plot; code renders it. |
+
+Every stage has a deterministic fallback, so with **None**/no key the app still
+runs (rule-based router, regex extraction, fixed line charts). Verify the LLM
+path with no API calls:
+
+```bash
+python -m tests.test_llm_agent   # uses a scripted MockProvider
 ```
 
 ### LLM layer (bring your own provider)

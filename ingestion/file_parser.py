@@ -25,21 +25,46 @@ def file_hash(data: bytes) -> str:
 
 
 def parse_file(filename: str, data: bytes, person: str = "self",
-               timestamp: Optional[str] = None) -> Tuple[List[Dict], str]:
-    """Dispatch on file type. Returns (observations, extracted_text)."""
+               timestamp: Optional[str] = None,
+               provider=None) -> Tuple[List[Dict], str]:
+    """Dispatch on file type. Returns (observations, extracted_text).
+
+    For text-bearing formats (PDF/image/text), if an LLM `provider` is given
+    and available, the report text is also read by the model — catching
+    measurements the regex layer misses in messy lab reports — and merged with
+    the rule-based extraction. CSV stays purely structured/deterministic.
+    """
     name = filename.lower()
     if name.endswith(".csv"):
         return _parse_csv(data, person, timestamp)
     if name.endswith(".pdf"):
         text = _parse_pdf(data)
-        return _from_text(text, person, filename, timestamp), text
+        return _extract(text, person, filename, timestamp, provider), text
     if name.endswith((".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp")):
         text = _parse_image(data)
-        return _from_text(text, person, filename, timestamp), text
+        return _extract(text, person, filename, timestamp, provider), text
     if name.endswith((".txt", ".md")):
         text = data.decode("utf-8", errors="ignore")
-        return _from_text(text, person, filename, timestamp), text
+        return _extract(text, person, filename, timestamp, provider), text
     raise ValueError(f"Unsupported file type: {filename}")
+
+
+def _extract(text: str, person: str, filename: str,
+             timestamp: Optional[str], provider) -> List[Dict]:
+    """Merge LLM document extraction (if available) with regex extraction."""
+    records = _from_text(text, person, filename, timestamp)
+    if provider is not None and getattr(provider, "available",
+                                        lambda: False)():
+        from llm.agent import extract_document
+        from ingestion.metrics import REGISTRY
+        llm_records = extract_document(text, provider, list(REGISTRY.keys()),
+                                       person=person, source=f"file:{filename}")
+        if llm_records:
+            seen = {(r["metric"], r["numericValue"]) for r in records}
+            for r in llm_records:
+                if (r["metric"], r["numericValue"]) not in seen:
+                    records.append(r)
+    return records
 
 
 def _from_text(text: str, person: str, filename: str,
