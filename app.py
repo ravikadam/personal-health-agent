@@ -196,16 +196,50 @@ with tab_chat:
                 st.caption(f"↳ understood & answered by {provider.name}, "
                            f"grounded in the ontology (intent: {turn['mode']})")
 
-            # Logged observations
+            # Logged observations (with ontology-tiered severity)
             logged = turn.get("logged")
+            urgent = False
             if logged and logged.get("records"):
                 lines = [f"Logged **{logged['added']}** observation(s):"]
                 for e in logged["records"]:
+                    ctx = f" _({e['context']})_" if e.get("context") else ""
+                    sev = e.get("severity") or {}
+                    badge = ""
+                    if sev.get("level") == "urgent":
+                        urgent = True
+                        badge = (f"  🚨 **{sev.get('clinical_name') or 'critical'}"
+                                 f"** (`{sev.get('ontology_class')}`)")
+                    elif sev.get("level") == "caution":
+                        badge = (f"  ⚠️ {sev.get('clinical_name') or 'out of range'}"
+                                 f" (`{sev.get('ontology_class')}`)")
                     lines.append(f"- {e['label']}: **{e['numericValue']} "
-                                 f"{e['unit']}** → `{e['type']}`")
+                                 f"{e['unit']}**{ctx} → `{e['type']}`{badge}")
                 if logged.get("rejected"):
                     lines.append(f"\n_Rejected {logged['rejected']}: "
                                  f"{'; '.join(logged['reasons'])}_")
+                block = "\n".join(lines)
+                st.markdown(block)
+                if urgent:
+                    st.error("🚨 A reading is in the urgent range — please act "
+                             "promptly and consider contacting a clinician.")
+                reply_parts.append(block)
+
+            # Self-reported symptoms → SymptomObservation
+            sym = turn.get("symptoms")
+            if sym and sym.get("records"):
+                names = ", ".join(f"**{r['label']}**" for r in sym["records"])
+                block = f"🩹 Noted symptom(s): {names} → `SymptomObservation`"
+                st.markdown(block)
+                reply_parts.append(block)
+
+            # Symptom↔reading associations → AssociationAssessment / hypothesis
+            assoc = turn.get("associations")
+            if assoc and assoc.get("entities"):
+                lines = ["🔗 Recorded association(s):"]
+                for e in assoc["entities"]:
+                    conf = e.get("confidence")
+                    ctag = f" · conf {conf}" if conf is not None else ""
+                    lines.append(f"- **{e['name']}** (`{e['type']}`){ctag}")
                 block = "\n".join(lines)
                 st.markdown(block)
                 reply_parts.append(block)

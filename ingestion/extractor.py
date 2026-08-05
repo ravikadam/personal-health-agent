@@ -106,9 +106,15 @@ def _looks_like_bp(m) -> bool:
 
 
 def _make_record(metric_key: str, value: float, unit: Optional[str],
-                 person: str, source: str, ts: str, raw: str) -> Dict:
+                 person: str, source: str, ts: str, raw: str,
+                 context: Optional[str] = None) -> Dict:
+    from .metrics import detect_context
     mdef = REGISTRY[metric_key]
     norm_value, norm_unit = normalize_unit(metric_key, value, unit)
+    # Capture a reading qualifier (fasting / post-meal / ...) from the text
+    # when not explicitly supplied — clinically important, esp. for glucose.
+    if context is None:
+        context = detect_context(raw)
     return {
         "metric": metric_key,
         "type": mdef.ontology_class,
@@ -120,6 +126,7 @@ def _make_record(metric_key: str, value: float, unit: Optional[str],
         "source": source,
         "timestamp": ts,
         "raw_text": raw.strip()[:280],
+        "context": context,
     }
 
 

@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS uploads (
 _OBS_COLS = ["id", "ontology_class", "metric", "label", "category",
              "numeric_value", "unit", "text_value", "observed_for", "source",
              "timestamp", "recorded_at", "raw_text", "linked_to", "supersedes",
-             "confidence"]
+             "confidence", "context"]
 
 
 class MemoryStore:
@@ -107,6 +107,11 @@ class MemoryStore:
         self.ontology = load_ontology()
         with self._connect() as con:
             con.executescript(_SCHEMA)
+            # Lightweight migration: add columns introduced after first release.
+            cols = {r[1] for r in con.execute(
+                "PRAGMA table_info(observations)")}
+            if "context" not in cols:
+                con.execute("ALTER TABLE observations ADD COLUMN context TEXT")
 
     def _connect(self) -> sqlite3.Connection:
         con = sqlite3.connect(self.db_path)
@@ -151,6 +156,7 @@ class MemoryStore:
                     "linked_to": rec.get("linked_to"),
                     "supersedes": rec.get("supersedes"),
                     "confidence": rec.get("confidence", 1.0),
+                    "context": rec.get("context"),
                 }
                 con.execute(
                     f"INSERT INTO observations ({','.join(_OBS_COLS)}) "
@@ -179,6 +185,7 @@ class MemoryStore:
             "linked_to": row["linked_to"],
             "supersedes": row["supersedes"],
             "confidence": row["confidence"],
+            "context": row["context"] if "context" in row.keys() else None,
         }
 
     def all_observations(self) -> List[Dict]:

@@ -161,3 +161,83 @@ def normalize_unit(metric_key: str, value: float,
     if u == mdef.canonical_unit.lower():
         return value, mdef.canonical_unit
     return value, unit
+
+
+# --------------------------------------------------------------------------- #
+# Clinical escalation thresholds (in canonical units). Tiers map to ontology
+# concepts: a breached "caution" bound is a phm:Precaution, an "urgent" bound a
+# phm:EscalationRule trigger (and, if realised, a phm:AdverseEvent).
+# --------------------------------------------------------------------------- #
+CRITICAL_THRESHOLDS = {
+    "glucose": {"low_urgent": 54, "low_caution": 70,
+                "high_caution": 180, "high_urgent": 250},
+    "systolic": {"low_caution": 90, "high_caution": 140, "high_urgent": 180},
+    "diastolic": {"high_caution": 90, "high_urgent": 120},
+    "spo2": {"low_urgent": 90, "low_caution": 94},
+    "heart_rate": {"low_caution": 50, "high_caution": 100, "high_urgent": 130},
+    "temperature": {"low_caution": 35.0, "high_caution": 38.0,
+                    "high_urgent": 39.5},
+}
+
+# Friendly clinical names for a breach, per metric/direction.
+_BREACH_NAMES = {
+    ("glucose", "low"): "hypoglycemia",
+    ("glucose", "high"): "hyperglycemia",
+    ("systolic", "high"): "high blood pressure",
+    ("diastolic", "high"): "high blood pressure",
+    ("spo2", "low"): "low oxygen saturation",
+    ("heart_rate", "low"): "bradycardia",
+    ("heart_rate", "high"): "tachycardia",
+    ("temperature", "high"): "fever",
+    ("temperature", "low"): "hypothermia",
+}
+
+ESCALATION_CLASS = {"caution": "Precaution", "urgent": "EscalationRule"}
+
+# Recognised context qualifiers for a reading (esp. glucose).
+CONTEXT_KEYWORDS = {
+    "fasting": ["fasting", "fasted", "before breakfast", "pre-meal", "premeal"],
+    "postprandial": ["postprandial", "post meal", "post-meal", "after meal",
+                     "after eating", "pp"],
+    "random": ["random", "casual"],
+    "bedtime": ["bedtime", "before bed", "night"],
+}
+
+
+def detect_context(text: str):
+    """Return a reading-context qualifier (fasting/postprandial/...) or None."""
+    low = (text or "").lower()
+    for ctx, kws in CONTEXT_KEYWORDS.items():
+        if any(k in low for k in kws):
+            return ctx
+    return None
+
+
+def classify_severity(metric: str, value):
+    """Tier a value against clinical thresholds. Returns a dict with level
+    (none|caution|urgent), direction, a clinical name and the ontology class
+    the tier maps to."""
+    t = CRITICAL_THRESHOLDS.get(metric)
+    if not t or value is None:
+        return {"level": "none"}
+    v = float(value)
+    hits = []
+    if "low_urgent" in t and v < t["low_urgent"]:
+        hits.append(("urgent", "low"))
+    elif "low_caution" in t and v < t["low_caution"]:
+        hits.append(("caution", "low"))
+    if "high_urgent" in t and v > t["high_urgent"]:
+        hits.append(("urgent", "high"))
+    elif "high_caution" in t and v > t["high_caution"]:
+        hits.append(("caution", "high"))
+    if not hits:
+        return {"level": "none"}
+    level, direction = hits[0]
+    name = _BREACH_NAMES.get((metric, direction))
+    return {
+        "level": level,
+        "direction": direction,
+        "clinical_name": name,
+        "ontology_class": ESCALATION_CLASS[level],
+        "value": v,
+    }

@@ -31,10 +31,37 @@ METRIC_KEYS = list(REGISTRY.keys())
 # Public entry point
 # --------------------------------------------------------------------------- #
 def handle_turn(store, message: str, provider) -> Dict:
-    plan = agent.understand(message, provider, METRIC_KEYS)
+    plan = agent.understand(message, provider, METRIC_KEYS,
+                            context=_recent_context(store))
     if plan is None:
         return _rule_based_turn(store, message, provider)
     return _planned_turn(store, message, plan, provider)
+
+
+def _recent_context(store, limit: int = 8) -> str:
+    """A short briefing of recent readings + profile for the router, so it can
+    detect symptoms and propose associations to real data."""
+    obs = [o for o in store.all_observations() if o.get("numericValue")
+           is not None]
+    obs.sort(key=lambda o: o.get("timestamp", ""), reverse=True)
+    lines = []
+    from ingestion.metrics import classify_severity
+    for o in obs[:limit]:
+        sev = classify_severity(o.get("metric"), o.get("numericValue"))
+        flag = f" [{sev['level']}:{sev.get('clinical_name') or ''}]" \
+            if sev["level"] != "none" else ""
+        ctx = f" ({o['context']})" if o.get("context") else ""
+        lines.append(f"- {o.get('label')} {o['numericValue']}{o.get('unit') or ''}"
+                     f"{ctx} at {(o.get('timestamp') or '')[:16]}{flag}")
+    prof = _profile_payload(store)
+    prof_lines = [f"- {cls}: {', '.join(i['name'] for i in items)}"
+                  for cls, items in prof.items()]
+    out = []
+    if lines:
+        out.append("Recent readings:\n" + "\n".join(lines))
+    if prof_lines:
+        out.append("Profile:\n" + "\n".join(prof_lines))
+    return "\n".join(out)
 
 
 # --------------------------------------------------------------------------- #
@@ -43,22 +70,27 @@ def handle_turn(store, message: str, provider) -> Dict:
 def _planned_turn(store, message: str, plan: Dict, provider) -> Dict:
     result: Dict = {"mode": plan.get("intent", "chat"), "plan": plan,
                     "used_llm": True, "logged": None, "memory": None,
-                    "answer": None}
+                    "symptoms": None, "associations": None, "answer": None}
     intent = plan.get("intent", "chat")
 
     # Persist whatever the LLM extracted, regardless of intent label: numeric
-    # readings AND memory facts (conditions/medications). A pure statement like
-    # "I'm diabetic and have BP issues" carries no numbers but must still update
-    # memory.
+    # readings, self-reported symptoms, durable memory facts, and any
+    # symptom↔reading associations. A statement like "I'm diabetic" or "I feel
+    # dizzy" carries no numbers but must still update memory.
     if plan.get("observations"):
         result["logged"] = _log_from_plan(store, message, plan)
+    if plan.get("symptoms"):
+        result["symptoms"] = _log_symptoms(store, message, plan)
     if plan.get("memory_facts"):
         result["memory"] = _apply_memory_facts(store, plan)
+    if plan.get("associations"):
+        result["associations"] = _apply_associations(store, plan)
 
     # Compose an answer for questions, or when the turn was purely
     # conversational with nothing to store.
-    nothing_stored = not (result["logged"] or result["memory"])
-    if intent in ("query", "mixed") or (intent == "chat" and nothing_stored):
+    stored = any(result[k] for k in ("logged", "memory", "symptoms",
+                                     "associations"))
+    if intent in ("query", "mixed") or (intent == "chat" and not stored):
         result["answer"] = _answer_from_plan(store, message, plan, provider)
 
     return result
@@ -72,16 +104,90 @@ def _log_from_plan(store, message: str, plan: Dict) -> Dict:
             continue
         records.append(_make_record(key, float(o["value"]), o.get("unit"),
                                     "self", "chat",
-                                    o.get("timestamp")
-                                    or _now(), message))
+                                    o.get("timestamp") or _now(), message,
+                                    context=o.get("context")))
     # Merge with regex to catch anything the model missed.
     for r in extract_observations(message, person="self", source="chat"):
         if not any(x["metric"] == r["metric"]
                    and x["numericValue"] == r["numericValue"] for x in records):
             records.append(r)
     res = store.add_observations(records)
+    # Attach an ontology-tiered severity flag to each logged reading.
+    from ingestion.metrics import classify_severity
+    for r in records:
+        r["severity"] = classify_severity(r.get("metric"), r.get("numericValue"))
     res["records"] = records
     return res
+
+
+def _log_symptoms(store, message: str, plan: Dict) -> Dict:
+    """Record self-reported symptoms as SymptomObservations (SelfReported)."""
+    records = []
+    for s in plan.get("symptoms", []):
+        name = (s.get("name") or "").strip()
+        if not name:
+            continue
+        records.append({
+            "type": "SymptomObservation",
+            "metric": None,
+            "label": name.capitalize(),
+            "category": "symptom",
+            "numericValue": None,
+            "unit": None,
+            "textValue": name,
+            "observedFor": "self",
+            "source": "chat",
+            "timestamp": _now(),
+            "raw_text": (s.get("note") or message)[:280],
+        })
+    res = store.add_observations(records)
+    res["records"] = records
+    return res
+
+
+def _apply_associations(store, plan: Dict) -> Dict:
+    """Persist symptom↔reading links as ontology interpretations: an
+    AssociationAssessment (or CausalHypothesis) entity + a provenance-bearing
+    MemoryAssertion whose evidence points at the actual reading.
+
+    Only created when the exposure resolves to a real stored observation, so we
+    never fabricate an unsupported link."""
+    observations = store.all_observations()
+    entities, assertions = [], []
+    for a in plan.get("associations", []):
+        outcome = (a.get("outcome") or "").strip()
+        if not outcome:
+            continue
+        exp_metric = a.get("exposure_metric")
+        # find the most recent numeric reading for the exposure metric
+        evidence_obs = None
+        if exp_metric:
+            cands = [o for o in observations if o.get("metric") == exp_metric
+                     and o.get("numericValue") is not None]
+            cands.sort(key=lambda o: o.get("timestamp", ""), reverse=True)
+            evidence_obs = cands[0] if cands else None
+        if exp_metric and not evidence_obs:
+            continue  # exposure named but no data -> don't fabricate
+
+        relation = a.get("relation", "association")
+        is_causal = relation == "causal_hypothesis"
+        cls = "CausalHypothesis" if is_causal else "AssociationAssessment"
+        exposure_desc = a.get("exposure_desc") or exp_metric or "exposure"
+        name = f"{exposure_desc} → {outcome}"
+        conf = a.get("confidence")
+        ent = store.add_entity(cls, name, note=a.get("rationale"),
+                               confidence=conf)
+        entities.append(ent)
+
+        predicate = "hypothesizesCause" if is_causal else "associatedWith"
+        evidence = [b for b in (
+            evidence_obs["id"] if evidence_obs else None,
+            f"exposure={exposure_desc}", f"outcome={outcome}",
+            a.get("rationale")) if b]
+        assertions.append(store.add_assertion(
+            "self", predicate, name, status="Candidate",
+            confidence=conf if conf is not None else 0.5, evidence=evidence))
+    return {"entities": entities, "assertions": assertions}
 
 
 # Sensible ontology fallbacks per fact kind: (class, object property).
@@ -174,9 +280,12 @@ def _answer_from_plan(store, message: str, plan: Dict, provider) -> Dict:
     # goals, risk factors) so the answer is grounded in semantic memory, not
     # just numeric observations.
     profile = _profile_payload(store)
+    symptoms = _recent_symptoms(store)
     profile_classes = list(profile.keys())
+    if symptoms:
+        profile_classes.append("SymptomObservation")
     grounding = ground(eff_metrics, ont_types + profile_classes)
-    facts = _facts_payload(hits, summaries, correlation, profile)
+    facts = _facts_payload(hits, summaries, correlation, profile, symptoms)
 
     explanation = agent.compose_answer(message, facts, provider, eff_metrics)
     used_llm = explanation is not None
@@ -243,11 +352,23 @@ def _profile_payload(store) -> Dict:
     return profile
 
 
+def _recent_symptoms(store, limit: int = 6) -> List[Dict]:
+    """Recent self-reported SymptomObservations (qualitative)."""
+    syms = [o for o in store.all_observations()
+            if o.get("type") == "SymptomObservation"]
+    syms.sort(key=lambda o: o.get("timestamp", ""), reverse=True)
+    return [{"name": o.get("textValue") or o.get("label"),
+             "at": (o.get("timestamp") or "")[:16]} for o in syms[:limit]]
+
+
 def _facts_payload(hits: List[Dict], summaries: List[Dict],
                    correlation: Optional[Dict],
-                   profile: Optional[Dict] = None) -> Dict:
+                   profile: Optional[Dict] = None,
+                   symptoms: Optional[List[Dict]] = None) -> Dict:
+    from ingestion.metrics import classify_severity
     return {
         "person_profile": profile or {},
+        "recent_symptoms": symptoms or [],
         "record_count": len(hits),
         "summaries": [
             {
@@ -259,6 +380,8 @@ def _facts_payload(hits: List[Dict], summaries: List[Dict],
                 "trend": s["trend"]["direction"],
                 "normal_range": s.get("normal_range"),
                 "anomaly_count": len(s.get("anomalies", [])),
+                # ontology-tiered clinical severity of the latest value
+                "escalation": classify_severity(s["metric"], s["latest"]),
             } for s in summaries
         ],
         "correlation": correlation,
