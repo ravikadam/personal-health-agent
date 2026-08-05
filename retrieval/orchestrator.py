@@ -335,6 +335,87 @@ def _rule_based_turn(store, message: str, provider) -> Dict:
 # --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #
+def interpret_and_store_labs(store, source: str, provider) -> Optional[Dict]:
+    """After a lab report is ingested, derive ontology memory from it:
+    ClinicalAssessments of abnormal findings, and *candidate* condition
+    hypotheses — all as evidence-backed, Candidate-status memory, never a
+    diagnosis. Returns a summary for the UI, or None if unavailable."""
+    if provider is None or not getattr(provider, "available",
+                                       lambda: False)():
+        return None
+    obs = [o for o in store.all_observations()
+           if (o.get("source") or "") == source
+           and o.get("numericValue") is not None]
+    if not obs:
+        return None
+    findings = [{
+        "obs_id": o["id"], "test": o.get("label"),
+        "value": o.get("numericValue"), "unit": o.get("unit"),
+        "ref": o.get("ref_text") or (
+            f"{o.get('ref_low')}-{o.get('ref_high')}"
+            if o.get("ref_low") is not None else None),
+        "flag": o.get("abnormal_flag"),
+    } for o in obs]
+
+    result = agent.interpret_labs(findings, _profile_payload(store), provider)
+    if not result:
+        return None
+
+    ont = store.ontology
+    assessments, conditions = [], []
+    existing_names = {e["name"].lower() for e in store.entities()}
+    existing_asserts = {(a["predicate"], (a["object"] or "").lower())
+                        for a in store.assertions()}
+
+    # 1) Clinical assessments of findings (interpretsObservation -> reading)
+    for a in result.get("assessments", []):
+        text = (a.get("assessment") or "").strip()
+        if not text or not a.get("abnormal", True):
+            continue
+        cls = a.get("ontology_class")
+        if cls not in ("ClinicalAssessment", "OutcomeAssessment") \
+                or not ont.is_class(cls):
+            cls = "ClinicalAssessment"
+        ent = store.add_entity(cls, text[:150], note=a.get("finding"))
+        if a.get("obs_id"):
+            store.add_assertion(ent["id"], "interpretsObservation",
+                                a["obs_id"], status="Candidate",
+                                evidence=[a.get("finding")])
+        assessments.append({"class": cls, "text": text,
+                            "finding": a.get("finding")})
+
+    # 2) Candidate condition hypotheses (Candidate status, cited evidence)
+    for c in result.get("candidate_conditions", []):
+        name = (c.get("name") or "").strip()
+        if not name:
+            continue
+        cls = c.get("ontology_class")
+        if cls not in ("ChronicCondition", "Comorbidity", "HealthCondition") \
+                or not ont.is_class(cls):
+            cls = "ChronicCondition"
+        conf = c.get("confidence")
+        ev = [str(x) for x in (c.get("evidence_obs_ids") or [])]
+        if c.get("rationale"):
+            ev.append(c["rationale"])
+        supports = c.get("supports_existing") or name.lower() in existing_names
+
+        if name.lower() not in existing_names:
+            store.add_entity(cls, name, note=c.get("rationale"),
+                             status="Candidate", confidence=conf)
+            existing_names.add(name.lower())
+        if ("hasCondition", name.lower()) not in existing_asserts:
+            store.add_assertion("self", "hasCondition", name,
+                                status="Candidate",
+                                confidence=conf if conf is not None else 0.5,
+                                evidence=ev)
+            existing_asserts.add(("hasCondition", name.lower()))
+        conditions.append({"name": name, "class": cls, "confidence": conf,
+                           "rationale": c.get("rationale"),
+                           "supports_existing": supports})
+
+    return {"assessments": assessments, "conditions": conditions}
+
+
 def _profile_payload(store) -> Dict:
     """The person's durable memory (conditions, meds, allergies, diet, goals,
     risk factors) grouped by ontology class, for grounding answers."""

@@ -23,7 +23,7 @@ from ontology.grounding import ground
 from ontology.ontology_loader import load_ontology
 from reports.generator import (build_report, report_to_markdown,
                                series_dataframe)
-from retrieval.orchestrator import handle_turn
+from retrieval.orchestrator import handle_turn, interpret_and_store_labs
 
 st.set_page_config(page_title="Personal Health Agent", page_icon="🩺",
                    layout="wide")
@@ -321,6 +321,35 @@ with tab_upload:
                 st.dataframe(pd.DataFrame(records)[
                     ["label", "numericValue", "unit", "type", "timestamp"]],
                     use_container_width=True, hide_index=True)
+
+            # Derive ontology interpretations + candidate conditions from labs
+            is_lab = any(r.get("type") == "LaboratoryObservation"
+                         or r.get("metric") in ("hba1c", "glucose")
+                         for r in records)
+            if is_lab and upload_provider.available():
+                with st.spinner(f"🩺 Interpreting labs with "
+                                f"{upload_provider.name}…"):
+                    interp = interpret_and_store_labs(
+                        store, f"file:{f.name}", upload_provider)
+                if interp:
+                    if interp["assessments"]:
+                        st.markdown("**🩺 Clinical assessments** "
+                                    "(`ClinicalAssessment` / `OutcomeAssessment`)")
+                        for a in interp["assessments"]:
+                            st.markdown(f"- _{a['finding']}_ — {a['text']}")
+                    if interp["conditions"]:
+                        st.markdown("**🧩 Candidate conditions** "
+                                    "(hypotheses — `status: Candidate`, "
+                                    "not a diagnosis)")
+                        for c in interp["conditions"]:
+                            tag = ("corroborates existing"
+                                   if c["supports_existing"] else "new")
+                            st.markdown(
+                                f"- **{c['name']}** (`{c['class']}`) · "
+                                f"confidence {c['confidence']} · _{tag}_  \n"
+                                f"  ↳ {c['rationale']}")
+                        st.info("⚠️ These are evidence-based hypotheses for you "
+                                "and your clinician to review — not a diagnosis.")
             with st.expander(f"Extracted text — {f.name}"):
                 st.text((text or "")[:4000])
         st.rerun()

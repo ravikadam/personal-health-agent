@@ -242,6 +242,50 @@ def extract_lab_report(text: str, provider) -> Optional[List[Dict]]:
 # --------------------------------------------------------------------------- #
 # 3. Compose the final answer from computed facts
 # --------------------------------------------------------------------------- #
+def interpret_labs(findings: List[Dict], profile: Dict,
+                   provider) -> Optional[Dict]:
+    """Interpret a lab panel into ontology-aligned memory: ClinicalAssessments
+    per abnormal finding and *candidate* condition hypotheses (never a
+    diagnosis), each citing the observation ids as evidence."""
+    if provider is None or not getattr(provider, "available",
+                                       lambda: False)():
+        return None
+    if not findings:
+        return None
+    system = build_llm_context() + (
+        "\n\nTASK: Interpret this laboratory panel for the person's health "
+        "MEMORY, grounded in the phm ontology. Return ONLY JSON:\n"
+        '{\n'
+        '  "assessments": [{"finding": test name, "obs_id": id from input, '
+        '"assessment": one concise clinical interpretation, "ontology_class": '
+        '"ClinicalAssessment"|"OutcomeAssessment", "abnormal": true|false}],\n'
+        '  "candidate_conditions": [{"name": condition name, "ontology_class": '
+        '"ChronicCondition"|"Comorbidity"|"HealthCondition", "status": '
+        '"Candidate", "confidence": 0..1, "rationale": short string citing the '
+        'labs, "evidence_obs_ids": [ids from input], "supports_existing": '
+        'true|false}]\n'
+        "}\n"
+        "RULES: Focus on abnormal (flag H/L) findings. Candidate conditions are "
+        "HYPOTHESES, never a diagnosis — ALWAYS status 'Candidate', with a "
+        "calibrated confidence and cited evidence_obs_ids. Prefer the report's "
+        "own reference classifications (e.g. HbA1c 'Diabetic >=6.5'). If a "
+        "condition is already in the person's profile, set supports_existing "
+        "true (corroboration). Only propose conditions with reasonable support. "
+        "Never invent values. JSON only."
+    )
+    user = ("Person profile (already known):\n"
+            + json.dumps(profile, default=str)[:1500]
+            + "\n\nLab findings (obs_id, test, value, unit, ref, flag):\n"
+            + json.dumps(findings, default=str)[:7000])
+    old = provider.config.max_tokens
+    provider.config.max_tokens = max(old, 4000)
+    try:
+        result = provider.extract_json(system, user)
+    finally:
+        provider.config.max_tokens = old
+    return result if isinstance(result, dict) else None
+
+
 def compose_answer(question: str, facts: Dict, provider,
                    metrics: List[str]) -> Optional[str]:
     """Write the response using ONLY the provided (already-computed) facts."""
